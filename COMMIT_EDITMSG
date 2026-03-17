@@ -1,0 +1,10 @@
+Add data grounding to improve model accuracy and prevent hallucinations
+
+Implement data anchoring and strict interpretation rules in prompts to ensure the model only uses provided data, preventing factual inaccuracies and hallucinations.
+
+Replit-Commit-Author: Agent
+Replit-Commit-Session-Id: 80411d9c-2cb5-4963-a07f-3d76819b0407
+Replit-Commit-Checkpoint-Type: full_checkpoint
+Replit-Commit-Event-Id: f5e8eb24-319a-4620-97df-28fed3cc6074
+Replit-Commit-Screenshot-Url: https://storage.googleapis.com/screenshot-production-us-central1/1dd18ad5-aece-49b7-9e66-52685d93046d/80411d9c-2cb5-4963-a07f-3d76819b0407/UVos1bx
+Replit-Helium-Checkpoint-Created: true
