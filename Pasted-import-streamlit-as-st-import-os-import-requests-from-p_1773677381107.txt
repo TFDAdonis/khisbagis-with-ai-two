@@ -1,0 +1,154 @@
+import streamlit as st
+import os
+import requests
+from pathlib import Path
+
+MODEL_DIR = Path("models")
+MODEL_PATH = MODEL_DIR / "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+MODEL_URL = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+
+st.set_page_config(
+    page_title="TinyLLaMA Chat",
+    page_icon="🦙",
+    layout="centered"
+)
+
+st.title("🦙 TinyLLaMA Chat")
+st.caption("A local AI chat powered by TinyLLaMA 1.1B")
+
+def download_model():
+    """Download the model from Hugging Face with progress."""
+    MODEL_DIR.mkdir(exist_ok=True)
+    
+    try:
+        response = requests.get(MODEL_URL, stream=True, timeout=30)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Failed to download model: {str(e)}")
+    
+    total_size = int(response.headers.get('content-length', 0))
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    downloaded = 0
+    try:
+        with open(MODEL_PATH, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        progress = downloaded / total_size
+                        progress_bar.progress(progress)
+                        status_text.text(f"Downloading: {downloaded / (1024**2):.1f} / {total_size / (1024**2):.1f} MB")
+    except Exception as e:
+        if MODEL_PATH.exists():
+            MODEL_PATH.unlink()
+        raise Exception(f"Download interrupted: {str(e)}")
+    
+    if total_size > 0 and downloaded != total_size:
+        if MODEL_PATH.exists():
+            MODEL_PATH.unlink()
+        raise Exception(f"Incomplete download: got {downloaded} bytes, expected {total_size}")
+    
+    progress_bar.empty()
+    status_text.empty()
+    return True
+
+@st.cache_resource(show_spinner=False)
+def load_model():
+    """Load the TinyLLaMA model using ctransformers."""
+    from ctransformers import AutoModelForCausalLM
+    
+    if not MODEL_PATH.exists():
+        with st.spinner("Downloading TinyLLaMA model (~637 MB)..."):
+            download_model()
+    
+    model = AutoModelForCausalLM.from_pretrained(
+        str(MODEL_DIR),
+        model_file=MODEL_PATH.name,
+        model_type="llama",
+        context_length=2048,
+        gpu_layers=0
+    )
+    return model
+
+def format_prompt(messages):
+    """Format conversation history for TinyLLaMA chat format."""
+    prompt = ""
+    for msg in messages:
+        if msg["role"] == "user":
+            prompt += f"<|user|>\n{msg['content']}</s>\n"
+        elif msg["role"] == "assistant":
+            prompt += f"<|assistant|>\n{msg['content']}</s>\n"
+    prompt += "<|assistant|>\n"
+    return prompt
+
+def generate_response(model, messages, max_tokens=512, temperature=0.7):
+    """Generate a response from the model."""
+    prompt = format_prompt(messages)
+    
+    response = model(
+        prompt,
+        max_new_tokens=max_tokens,
+        temperature=temperature,
+        top_p=0.95,
+        stop=["</s>", "<|user|>", "<|assistant|>"]
+    )
+    
+    return response.strip()
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "model_loaded" not in st.session_state:
+    st.session_state.model_loaded = False
+
+with st.sidebar:
+    st.header("Settings")
+    temperature = st.slider("Temperature", 0.1, 2.0, 0.7, 0.1)
+    max_tokens = st.slider("Max Tokens", 64, 1024, 256, 64)
+    
+    st.divider()
+    
+    if st.button("Clear Chat", type="secondary"):
+        st.session_state.messages = []
+        st.rerun()
+    
+    st.divider()
+    st.caption("Model: TinyLLaMA 1.1B Chat v1.0")
+    st.caption("Quantization: Q4_K_M (~637 MB)")
+
+with st.spinner("Loading TinyLLaMA model... This may take a moment on first run."):
+    try:
+        model = load_model()
+        st.session_state.model_loaded = True
+    except Exception as e:
+        st.error(f"Failed to load model: {str(e)}")
+        st.stop()
+
+if st.session_state.model_loaded:
+    st.success("Model loaded and ready!", icon="✅")
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if prompt := st.chat_input("Send a message..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    with st.chat_message("user"):
+        st.markdown(prompt)
+    
+    with st.chat_message("assistant"):
+        with st.spinner("Thinking..."):
+            response = generate_response(
+                model,
+                st.session_state.messages,
+                max_tokens=max_tokens,
+                temperature=temperature
+            )
+        st.markdown(response)
+    
+    st.session_state.messages.append({"role": "assistant", "content": response})
