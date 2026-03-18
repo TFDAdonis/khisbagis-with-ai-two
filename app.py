@@ -6,11 +6,27 @@ import warnings
 import re as _re
 import os
 import requests
+from pathlib import Path
 import subprocess
 import sys
-from pathlib import Path
 
-# Try to import llama_cpp with detailed error handling
+# =============================================================================
+# AUTO-INSTALL TINYLLAMA IF MISSING
+# =============================================================================
+
+def install_llama_cpp():
+    """Attempt to install llama-cpp-python automatically"""
+    try:
+        st.info("📦 Installing llama-cpp-python... This may take a few minutes.")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "llama-cpp-python"])
+        st.success("✅ llama-cpp-python installed successfully! Please restart the app.")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ Failed to install llama-cpp-python: {e}")
+        st.info("Please run manually: pip install llama-cpp-python")
+        return False
+
+# Try to import llama_cpp, with auto-install option
 try:
     from llama_cpp import Llama
     LLAMA_AVAILABLE = True
@@ -29,7 +45,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS (same as before)
 st.markdown("""
 <style>
     .stApp {
@@ -194,57 +209,11 @@ st.markdown("""
         font-weight: 600;
         margin-left: 0.4rem;
     }
-    .install-instructions {
-        background: #1E1E1E;
-        border: 1px solid #00FF88;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-    }
-    .install-code {
-        background: #2A2A2A;
-        color: #00FF88;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
-        font-family: monospace;
-        margin: 0.5rem 0;
-    }
     @media (max-width: 768px) {
         .card { padding: 1rem; }
         h1 { font-size: 1.5rem !important; }
     }
     
-    /* Simple chart styles */
-    .simple-chart {
-        width: 100%;
-        height: 300px;
-        margin: 1rem 0;
-        position: relative;
-    }
-    .chart-bar {
-        display: inline-block;
-        background: linear-gradient(180deg, #00FF88 0%, #00CC6A 100%);
-        border-radius: 4px 4px 0 0;
-        margin: 0 2px;
-    }
-    .chart-line {
-        position: absolute;
-        height: 2px;
-        background: #FF6B6B;
-    }
-    .mini-legend {
-        display: flex;
-        gap: 1rem;
-        margin: 0.5rem 0;
-        font-size: 0.8rem;
-    }
-    .legend-color {
-        width: 12px;
-        height: 12px;
-        border-radius: 2px;
-        display: inline-block;
-        margin-right: 4px;
-    }
     .ai-header {
         display: flex;
         align-items: center;
@@ -262,40 +231,66 @@ st.markdown("""
         font-weight: 600;
         font-size: 1rem;
     }
+    .install-card {
+        background: linear-gradient(135deg, #1a2a1a, #0f1a0f);
+        border: 2px solid #00FF88;
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem 0;
+    }
+    .install-button {
+        background: #00FF88;
+        color: #0A0A0A;
+        border: none;
+        padding: 1rem 2rem;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    .install-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 0 20px rgba(0,255,136,0.5);
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# INSTALLATION HELPER FUNCTIONS
+# SHOW INSTALLATION UI IF LLAMA NOT AVAILABLE
 # =============================================================================
 
-def install_llama_cpp():
-    """Install llama-cpp-python package"""
-    try:
-        # Try to install via pip
-        result = subprocess.run(
-            [sys.executable, "-m", "pip", "install", "llama-cpp-python"],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        if result.returncode == 0:
-            return True, "Installation successful! Please restart the app."
-        else:
-            return False, f"Installation failed: {result.stderr}"
-    except Exception as e:
-        return False, f"Error during installation: {str(e)}"
-
-def check_llama_installation():
-    """Check if llama-cpp-python is installed"""
-    try:
-        import llama_cpp
-        return True, llama_cpp.__version__
-    except ImportError:
-        return False, None
+if not LLAMA_AVAILABLE:
+    st.markdown("""
+    <div class="install-card">
+        <span style="font-size: 4rem;">🦙</span>
+        <h2 style="color: #00FF88; margin: 1rem 0;">TinyLlama AI Not Installed</h2>
+        <p style="color: #CCCCCC; font-size: 1.1rem; margin-bottom: 2rem;">
+            To enable AI-powered chart interpretations, install llama-cpp-python and download the TinyLlama model.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📦 Auto-Install TinyLlama", use_container_width=True, type="primary"):
+            install_llama_cpp()
+        
+        st.markdown("""
+        <div style="background: #141414; border-radius: 12px; padding: 1.5rem; margin-top: 1rem;">
+            <h4 style="color: #FFFFFF; margin-bottom: 1rem;">📋 Manual Installation Instructions</h4>
+            <p style="color: #CCCCCC; margin-bottom: 0.5rem;">1. Open terminal/command prompt</p>
+            <p style="color: #CCCCCC; margin-bottom: 0.5rem;">2. Run: <code style="background: #2A2A2A; padding: 0.2rem 0.5rem; border-radius: 4px;">pip install llama-cpp-python</code></p>
+            <p style="color: #CCCCCC; margin-bottom: 0.5rem;">3. Restart this app</p>
+            <p style="color: #00FF88; margin-top: 1rem;">✨ Then download the TinyLlama model (637MB) when prompted</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.stop()
 
 # =============================================================================
-# TINYLLAMA MODEL (with graceful fallback)
+# TINYLLAMA MODEL SETUP
 # =============================================================================
 
 _APP_DIR = Path(__file__).parent.resolve()
@@ -303,15 +298,20 @@ MODEL_DIR = _APP_DIR / "models"
 MODEL_PATH = MODEL_DIR / "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
 MODEL_URL = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
 
+# Alternative smaller model if download size is an issue
+SMALL_MODEL_URL = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
+SMALL_MODEL_PATH = MODEL_DIR / "tinyllama-1.1b-chat-v1.0.Q2_K.gguf"
 
-def download_model_with_progress(progress_bar=None, status_text=None):
-    """Download the model file. Call this OUTSIDE any cached function."""
-    if not LLAMA_AVAILABLE:
-        return False, "llama-cpp-python not installed"
-    
+
+def download_model_with_progress(progress_bar=None, status_text=None, use_small_model=False):
+    """Download the model file with progress tracking."""
     MODEL_DIR.mkdir(exist_ok=True)
+    
+    url = SMALL_MODEL_URL if use_small_model else MODEL_URL
+    path = SMALL_MODEL_PATH if use_small_model else MODEL_PATH
+    
     try:
-        response = requests.get(MODEL_URL, stream=True, timeout=120)
+        response = requests.get(url, stream=True, timeout=120)
         response.raise_for_status()
     except Exception as e:
         return False, str(e)
@@ -319,7 +319,7 @@ def download_model_with_progress(progress_bar=None, status_text=None):
     total_size = int(response.headers.get('content-length', 0))
     downloaded = 0
     try:
-        with open(MODEL_PATH, 'wb') as f:
+        with open(path, 'wb') as f:
             for chunk in response.iter_content(chunk_size=65536):
                 if chunk:
                     f.write(chunk)
@@ -329,28 +329,31 @@ def download_model_with_progress(progress_bar=None, status_text=None):
                         if progress_bar:
                             progress_bar.progress(min(pct, 1.0))
                         if status_text:
-                            status_text.text(f"⬇️ Downloading TinyLlama: {downloaded/(1024**2):.0f} / {total_size/(1024**2):.0f} MB")
+                            mb_downloaded = downloaded/(1024**2)
+                            mb_total = total_size/(1024**2)
+                            status_text.text(f"⬇️ Downloading TinyLlama: {mb_downloaded:.0f} / {mb_total:.0f} MB")
     except Exception as e:
-        if MODEL_PATH.exists():
-            MODEL_PATH.unlink()
+        if path.exists():
+            path.unlink()
         return False, str(e)
     return True, "OK"
 
 
 @st.cache_resource(show_spinner=False)
 def load_tinyllama_model():
-    """Load TinyLlama from disk. Model file must already exist before calling this."""
-    if not LLAMA_AVAILABLE:
-        return None, "llama-cpp-python not installed. Please install it first."
+    """Load TinyLlama from disk."""
+    # Try the small model first if it exists, then fall back to regular
+    if SMALL_MODEL_PATH.exists():
+        model_path = str(SMALL_MODEL_PATH.resolve())
+    elif MODEL_PATH.exists():
+        model_path = str(MODEL_PATH.resolve())
+    else:
+        return None, "No model file found"
     
-    abs_path = str(MODEL_PATH.resolve())
     try:
-        if not MODEL_PATH.exists():
-            return None, f"Model not found at {abs_path}"
-        
-        print(f"🦙 Loading TinyLlama from {abs_path}")
+        print(f"🦙 Loading TinyLlama from {model_path}")
         llm = Llama(
-            model_path=abs_path,
+            model_path=model_path,
             n_ctx=1024,
             n_threads=2,
             n_batch=128,
@@ -379,7 +382,7 @@ def _seed(data_summary: str, chars: int = 130) -> str:
 
 
 def _build_chart_prompt(chart_type, data_summary, location):
-    """Build chart-specific prompts with data grounding for TinyLlama 1.1B."""
+    """Build chart-specific prompts with data grounding for TinyLlama."""
     ct = chart_type.lower()
     loc = location or "this region"
     seed = _seed(data_summary)
@@ -394,10 +397,118 @@ def _build_chart_prompt(chart_type, data_summary, location):
             f"<|assistant|>\n**Field Briefing — {loc}**\n"
             f"The recorded data for {loc} shows: {seed}. "
         )
-
-    # ... (rest of the prompt building functions remain the same as before)
-    # For brevity, I'm not repeating all the prompt functions here, but they should remain unchanged
-
+    elif "monthly temperature" in ct and "vegetation" not in ct:
+        return (
+            f"<|system|>\nYou are a crop calendar specialist. Analyze the monthly temperature rhythm and identify: "
+            f"(1) the optimal planting window, (2) any heat-stress or frost-risk months to avoid, "
+            f"(3) one specific crop variety recommendation that matches this thermal profile. Be precise about months."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nTemperature profile for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Crop Calendar Analysis — {loc}**\n"
+            f"Temperature data shows: {seed}. "
+        )
+    elif "precipitation" in ct and "vegetation" not in ct:
+        return (
+            f"<|system|>\nYou are an irrigation and water-management expert. Focus on: "
+            f"(1) the dry season gap and how many months crops go without meaningful rainfall, "
+            f"(2) whether supplemental irrigation is critical or optional, "
+            f"(3) a rainwater harvesting or scheduling tactic specific to this rainfall pattern."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nRainfall data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Water Management Assessment — {loc}**\n"
+            f"Rainfall data shows: {seed}. "
+        )
+    elif "soil moisture" in ct and "distribution" not in ct:
+        return (
+            f"<|system|>\nYou are a precision irrigation engineer. Interpret the soil moisture across depths as a story of root-zone health. "
+            f"Explain what the surface vs. root-zone vs. deep layer values reveal about drainage and water retention. "
+            f"Give one irrigation scheduling recommendation — be specific about timing and depth."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nSoil moisture profile for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Root-Zone Water Status — {loc}**\n"
+            f"Soil moisture readings show: {seed}. "
+        )
+    elif "distribution" in ct:
+        return (
+            f"<|system|>\nYou are a soil hydrologist. Compare the three moisture depth layers and explain what their ratio reveals about: "
+            f"(1) topsoil infiltration capacity, (2) subsoil water storage, (3) whether the soil profile favors shallow-rooted or deep-rooted crops. "
+            f"Recommend one drainage improvement if needed."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nMoisture depth comparison for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Soil Profile Hydrology — {loc}**\n"
+            f"Moisture depth data shows: {seed}. "
+        )
+    elif "soil texture" in ct or "texture composition" in ct:
+        return (
+            f"<|system|>\nYou are a soil physicist and land use planner. Describe the clay-silt-sand texture triangle position and what it means for: "
+            f"(1) tillage workability, (2) nutrient-holding capacity, (3) compaction risk. "
+            f"Name the one amendment or management practice that would most improve this soil structure."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nSoil texture for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Soil Texture & Workability — {loc}**\n"
+            f"Texture analysis shows: {seed}. "
+        )
+    elif "organic matter" in ct or "som" in ct:
+        return (
+            f"<|system|>\nYou are a soil carbon and fertility specialist. Interpret the SOM% and SOC stock value: "
+            f"is this soil carbon-rich, average, or depleted? What does this mean for natural fertility and microbial activity? "
+            f"Give one specific organic matter building practice suited to this level."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nSoil organic matter data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Carbon & Fertility Status — {loc}**\n"
+            f"Soil organic matter data shows: {seed}. "
+        )
+    elif "ndvi" in ct:
+        return (
+            f"<|system|>\nYou are a remote sensing agronomist specializing in NDVI time-series. "
+            f"Interpret the 24-month NDVI signal: identify seasonal peaks (crop cycles or natural flush), "
+            f"stress dips (drought, disease, or harvest), and the overall trend direction. "
+            f"Translate the mean NDVI value into a vegetation health category and a concrete management action."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nNDVI time series for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**NDVI Vegetation Health Signal — {loc}**\n"
+            f"NDVI data shows: {seed}. "
+        )
+    elif "evi" in ct:
+        return (
+            f"<|system|>\nYou are a canopy structure analyst. EVI captures canopy density and chlorophyll more accurately than NDVI in dense vegetation. "
+            f"Interpret the EVI trend: does it suggest healthy closed-canopy growth or sparse cover? "
+            f"Identify the peak biomass window and recommend one canopy management action."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nEVI canopy data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Canopy Density & Biomass — {loc}**\n"
+            f"EVI data shows: {seed}. "
+        )
+    elif "ndwi" in ct:
+        return (
+            f"<|system|>\nYou are a crop water-stress specialist. NDWI reflects water content in the plant canopy. "
+            f"Interpret the 24-month NDWI trend: when was the canopy water-stressed vs. well-watered? "
+            f"Pinpoint the critical stress window and give a targeted irrigation trigger recommendation."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nNDWI water stress data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Canopy Water Stress Timeline — {loc}**\n"
+            f"NDWI data shows: {seed}. "
+        )
+    elif "savi" in ct:
+        return (
+            f"<|system|>\nYou are a dryland farming expert. SAVI corrects NDVI for bare soil background — ideal for sparse or semi-arid vegetation. "
+            f"Interpret the SAVI values in the context of soil cover fraction: is vegetation cover adequate for erosion protection? "
+            f"Suggest one ground-cover improvement strategy."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nSAVI ground-cover data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Soil-Adjusted Vegetation Cover — {loc}**\n"
+            f"SAVI data shows: {seed}. "
+        )
+    elif "gndvi" in ct:
+        return (
+            f"<|system|>\nYou are a precision nutrition agronomist. GNDVI (green-band NDVI) is sensitive to chlorophyll and nitrogen status. "
+            f"Interpret the GNDVI signal: does it suggest nitrogen sufficiency, deficiency, or luxury uptake? "
+            f"Recommend a fertilization timing or rate adjustment based on the observed trend."
+            f"{_GROUNDING}\n</s>\n"
+            f"<|user|>\nGNDVI chlorophyll proxy data for {loc}: {data_summary}\n</s>\n"
+            f"<|assistant|>\n**Chlorophyll & Nitrogen Proxy — {loc}**\n"
+            f"GNDVI data shows: {seed}. "
+        )
     else:
         return (
             f"<|system|>\nYou are a precision agriculture data scientist. Analyze this geospatial dataset with scientific rigor. "
@@ -411,15 +522,12 @@ def _build_chart_prompt(chart_type, data_summary, location):
 
 def tinyllama_interpret(llm, chart_type, data_summary, location):
     """Call TinyLlama to produce a chart-specific, grounded interpretation."""
-    if llm is None or not LLAMA_AVAILABLE:
-        print(f"❌ tinyllama_interpret: llm is {llm}, LLAMA_AVAILABLE is {LLAMA_AVAILABLE}")
+    if llm is None:
         return None
     
-    print(f"✅ tinyllama_interpret: Attempting to generate for {chart_type}")
     prompt = _build_chart_prompt(chart_type, data_summary, location)
     
     try:
-        print(f"🦙 Calling model with prompt length: {len(prompt)}")
         output = llm(
             prompt,
             max_tokens=320,
@@ -429,12 +537,8 @@ def tinyllama_interpret(llm, chart_type, data_summary, location):
             stop=["</s>", "<|user|>", "<|system|>"]
         )
         text = output["choices"][0]["text"].strip()
-        print(f"✅ Model returned text length: {len(text)}")
         return text if len(text) > 30 else None
-    except Exception as e:
-        print(f"❌ Model inference failed: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception:
         return None
 
 
@@ -451,18 +555,8 @@ def _parse_float(text, pattern, default=None):
             pass
     return default
 
-def _parse_floats_list(text, pattern):
-    m = _re.search(pattern, text)
-    if m:
-        try:
-            return [float(x) for x in _re.findall(r'[-\d.]+', m.group(1)) if x not in ('', '-')]
-        except Exception:
-            pass
-    return []
-
 
 def get_smart_interpretation(chart_type, data_summary, location=""):
-    """Smart rule-based interpretation when TinyLlama is not available"""
     ct = chart_type.lower()
     loc_str = f" for {location}" if location else ""
 
@@ -473,7 +567,6 @@ def get_smart_interpretation(chart_type, data_summary, location=""):
         zm = _re.search(r'Climate zone:\s*([^,]+)', data_summary)
         if zm:
             zone = zm.group(1).strip()
-        aridity = _parse_float(data_summary, r'Aridity index:\s*([\d.]+)')
         parts = []
         if zone:
             parts.append(f"The climate{loc_str} is classified as **{zone}**.")
@@ -481,31 +574,112 @@ def get_smart_interpretation(chart_type, data_summary, location=""):
             if temp > 30:
                 parts.append(f"With a mean annual temperature of {temp:.1f}°C, heat stress is a significant factor — drought-tolerant and heat-adapted varieties are recommended.")
             elif temp > 20:
-                parts.append(f"A mean annual temperature of {temp:.1f}°C supports year-round cultivation of warm-season crops such as maize, sorghum, and legumes.")
+                parts.append(f"A mean annual temperature of {temp:.1f}°C supports year-round cultivation of warm-season crops.")
             elif temp > 10:
-                parts.append(f"A mean annual temperature of {temp:.1f}°C is ideal for temperate crops including wheat, barley, and a wide range of vegetables.")
+                parts.append(f"A mean annual temperature of {temp:.1f}°C is ideal for temperate crops.")
             else:
-                parts.append(f"A mean annual temperature of {temp:.1f}°C limits the growing season; cold-hardy crops and frost management are critical.")
+                parts.append(f"A mean annual temperature of {temp:.1f}°C limits the growing season; cold-hardy crops are critical.")
         if precip is not None:
             if precip < 250:
-                parts.append(f"Annual precipitation of {precip:.0f} mm indicates a hyper-arid regime — irrigation is essential for any agricultural production.")
+                parts.append(f"Annual precipitation of {precip:.0f} mm indicates a hyper-arid regime — irrigation is essential.")
             elif precip < 500:
-                parts.append(f"Annual precipitation of {precip:.0f} mm is semi-arid; supplemental irrigation during dry spells will significantly improve yields.")
+                parts.append(f"Annual precipitation of {precip:.0f} mm is semi-arid; supplemental irrigation recommended.")
             elif precip < 800:
-                parts.append(f"Annual precipitation of {precip:.0f} mm supports rainfed agriculture for most of the year, though seasonal deficits may require supplemental irrigation.")
+                parts.append(f"Annual precipitation of {precip:.0f} mm supports rainfed agriculture for most of the year.")
             else:
-                parts.append(f"High annual precipitation of {precip:.0f} mm means waterlogging and fungal diseases may need attention; drainage management is advisable.")
-        if aridity is not None:
-            if aridity < 0.2:
-                parts.append(f"The aridity index of {aridity:.2f} confirms extreme water scarcity conditions.")
-            elif aridity < 0.5:
-                parts.append(f"An aridity index of {aridity:.2f} places this area in the semi-arid category with seasonal moisture stress.")
-        return " ".join(parts) if parts else "Climate classification indicates typical regional conditions suitable for adapted local crop varieties."
+                parts.append(f"High annual precipitation of {precip:.0f} mm means waterlogging may need attention.")
+        return " ".join(parts) if parts else "Climate classification indicates typical regional conditions."
 
-    # ... (rest of the rule-based interpretation functions remain the same)
-    # For brevity, I'm not repeating all the rule-based functions here, but they should remain unchanged
+    if "temperature" in ct:
+        max_t = _parse_float(data_summary, r'Max.*?:\s*([\d.]+)°?C')
+        min_t = _parse_float(data_summary, r'Min.*?:\s*([\d.]+)°?C')
+        parts = []
+        if max_t and min_t:
+            rng = max_t - min_t
+            parts.append(f"Temperatures{loc_str} span {min_t:.1f}°C to {max_t:.1f}°C — a seasonal range of {rng:.1f}°C.")
+            if max_t > 30:
+                parts.append("Peak temperatures exceed 30°C — irrigation and shade management recommended.")
+            if min_t < 5:
+                parts.append("Minimum temperatures fall below 5°C, indicating frost risk.")
+        return " ".join(parts) if parts else f"Temperature data{loc_str} shows typical patterns."
 
-    return f"Analysis of {chart_type}{loc_str}: {data_summary[:200]}. Values are within expected ranges for this region."
+    if "precipitation" in ct:
+        annual = _parse_float(data_summary, r'Annual total:\s*([\d.]+)')
+        parts = []
+        if annual is not None:
+            if annual < 200:
+                parts.append(f"Total annual precipitation{loc_str} is extremely low at {annual:.0f} mm.")
+            elif annual < 400:
+                parts.append(f"Annual rainfall of {annual:.0f} mm{loc_str} is scarce.")
+            elif annual < 700:
+                parts.append(f"Annual precipitation of {annual:.0f} mm{loc_str} supports rainfed agriculture.")
+            else:
+                parts.append(f"Generous annual rainfall of {annual:.0f} mm{loc_str} supports productive rainfed farming.")
+        return " ".join(parts) if parts else f"Precipitation data{loc_str} shows typical distribution."
+
+    if "soil moisture" in ct:
+        surf = _parse_float(data_summary, r'Surface.*?:\s*([\d.]+)')
+        root = _parse_float(data_summary, r'Root.*?:\s*([\d.]+)')
+        parts = []
+        if surf is not None:
+            if surf > 0.3:
+                parts.append(f"Surface soil moisture{loc_str} is high at {surf:.3f} m³/m³.")
+            elif surf > 0.15:
+                parts.append(f"Surface soil moisture of {surf:.3f} m³/m³{loc_str} is moderate.")
+            else:
+                parts.append(f"Low surface moisture ({surf:.3f} m³/m³){loc_str} indicates dry topsoil.")
+        if root is not None:
+            if root > 0.25:
+                parts.append(f"Root-zone moisture ({root:.3f} m³/m³) is well-supplied.")
+            elif root > 0.1:
+                parts.append(f"Root-zone moisture ({root:.3f} m³/m³) is marginal.")
+            else:
+                parts.append(f"Root-zone moisture ({root:.3f} m³/m³) is critically low.")
+        return " ".join(parts) if parts else f"Soil moisture profile{loc_str} shows typical distribution."
+
+    if "soil texture" in ct:
+        clay = _parse_float(data_summary, r'Clay:\s*([\d.]+)%')
+        silt = _parse_float(data_summary, r'Silt:\s*([\d.]+)%')
+        sand = _parse_float(data_summary, r'Sand:\s*([\d.]+)%')
+        parts = []
+        if clay is not None and sand is not None:
+            if clay > 40:
+                parts.append(f"High clay content ({clay:.0f}%) provides excellent nutrient retention.")
+            elif sand > 60:
+                parts.append(f"Sandy texture ({sand:.0f}% sand) means rapid drainage.")
+            else:
+                parts.append(f"A balanced texture supports good soil structure.")
+        return " ".join(parts) if parts else f"Soil texture{loc_str} indicates typical properties."
+
+    if "organic matter" in ct or "som" in ct:
+        som = _parse_float(data_summary, r'Soil Organic Matter:\s*([\d.]+)%')
+        parts = []
+        if som is not None:
+            if som < 1.0:
+                parts.append(f"Soil organic matter{loc_str} is critically low at {som:.2f}%.")
+            elif som < 2.0:
+                parts.append(f"SOM of {som:.2f}%{loc_str} is below optimal.")
+            elif som < 4.0:
+                parts.append(f"SOM of {som:.2f}%{loc_str} is in the moderate range.")
+            else:
+                parts.append(f"Excellent SOM of {som:.2f}%{loc_str} reflects highly fertile soil.")
+        return " ".join(parts) if parts else f"Soil organic matter data{loc_str} indicates typical conditions."
+
+    if any(v in ct for v in ['ndvi', 'evi', 'savi', 'ndwi', 'gndvi']):
+        mean_v = _parse_float(data_summary, r'mean=([\d.]+)')
+        parts = []
+        if mean_v is not None:
+            if mean_v > 0.6:
+                parts.append(f"Vegetation index averages {mean_v:.3f} — dense, healthy vegetation.")
+            elif mean_v > 0.4:
+                parts.append(f"Vegetation index averages {mean_v:.3f} — moderate vegetation cover.")
+            elif mean_v > 0.2:
+                parts.append(f"Vegetation index averages {mean_v:.3f} — sparse vegetation.")
+            else:
+                parts.append(f"Vegetation index averages {mean_v:.3f} — very low greenness.")
+        return " ".join(parts) if parts else f"Vegetation data{loc_str} indicates typical dynamics."
+
+    return f"Analysis of {chart_type}{loc_str}: {data_summary[:200]}."
 
 
 # =============================================================================
@@ -523,8 +697,7 @@ SOIL_TEXTURE_CLASSES = {
 
 VEGETATION_INDICES = [
     'NDVI', 'EVI', 'SAVI', 'MSAVI', 'OSAVI', 'GNDVI', 'ARVI', 'VARI',
-    'NDMI', 'NBR', 'NDWI', 'MNDWI', 'AWEI', 'NDSI_Salinity', 'SI',
-    'BRI', 'MTVI', 'RDVI', 'NLI', 'GDVI'
+    'NDMI', 'NBR', 'NDWI', 'MNDWI', 'AWEI', 'NDSI_Salinity', 'SI'
 ]
 
 WORLD_REGIONS = {
@@ -553,13 +726,11 @@ def get_region_type(location_name):
     if not location_name:
         return "general"
     loc = location_name.lower()
-    if any(x in loc for x in ['sidi', 'algeria', 'morocco', 'tunisia', 'libya', 'north africa']):
+    if any(x in loc for x in ['sidi', 'algeria', 'morocco', 'tunisia']):
         return "Semi-arid"
-    elif any(x in loc for x in ['sahara', 'desert', 'sahel', 'egypt']):
+    elif any(x in loc for x in ['sahara', 'desert', 'egypt']):
         return "Arid"
     elif any(x in loc for x in ['amazon', 'congo', 'rainforest']):
-        return "Humid"
-    elif any(x in loc for x in ['france', 'germany', 'uk', 'spain']):
         return "Humid"
     return "general"
 
@@ -570,7 +741,7 @@ def accuracy_badge_html(level, text):
 
 
 # =============================================================================
-# SYNTHETIC DATA GENERATION
+# SYNTHETIC DATA
 # =============================================================================
 
 def generate_climate_data(location, start_year=2023, months=12, region_type="general"):
@@ -591,7 +762,6 @@ def generate_climate_data(location, start_year=2023, months=12, region_type="gen
         soil_m1 = max(0.05, 0.2 - seasonal * 0.08 + np.random.normal(0, 0.02))
         soil_m2 = max(0.08, 0.25 - seasonal * 0.06 + np.random.normal(0, 0.015))
         soil_m3 = max(0.1, 0.3 - seasonal * 0.04 + np.random.normal(0, 0.01))
-        pet = max(0, temp * 2.2 + 20 + np.random.normal(0, 5))
         records.append({
             "month": month_num,
             "month_name": datetime(start_year, month_num, 1).strftime('%b'),
@@ -599,7 +769,6 @@ def generate_climate_data(location, start_year=2023, months=12, region_type="gen
             "temperature_max": round(temp + np.random.uniform(3, 6), 1),
             "temperature_min": round(temp - np.random.uniform(3, 6), 1),
             "total_precipitation": round(precip, 1),
-            "potential_evaporation": round(pet, 1),
             "soil_moisture_0_7cm": round(soil_m1, 3),
             "soil_moisture_7_28cm": round(soil_m2, 3),
             "soil_moisture_28_100cm": round(soil_m3, 3),
@@ -619,12 +788,6 @@ def generate_vegetation_data(location, index_name, months=24):
     cfg = base_configs.get(region_type, base_configs["general"]).copy()
     if index_name in ['NDWI', 'MNDWI', 'AWEI']:
         cfg["base"] -= 0.15
-        cfg["amp"] *= 0.8
-    elif index_name in ['NBR']:
-        cfg["base"] += 0.1
-    elif index_name in ['SI', 'NDSI_Salinity']:
-        cfg["base"] = 0.4
-        cfg["amp"] = 0.15
     dates, values = [], []
     start = datetime(2023, 1, 1)
     for i in range(months):
@@ -686,485 +849,194 @@ def get_climate_classification(location, region_type):
 
 
 # =============================================================================
-# FIXED SIMPLE HTML CHARTS
+# SIMPLE HTML CHARTS
 # =============================================================================
 
 def create_temperature_chart_html(df, location_name):
-    """Create a simple HTML temperature chart"""
     months = df['month_name'].tolist()
     temps = df['temperature_2m'].tolist()
-    
     max_temp = max(temps)
     min_temp = min(temps)
     temp_range = max_temp - min_temp if max_temp > min_temp else 1
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Monthly Temperature</h4>
-            {accuracy_badge_html("high", "±1-2°C ERA5-Land")}
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; width: 100%;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Monthly Temperature</h4>
+            {accuracy_badge_html("high", "±1-2°C")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 250px;">
     '''
-    
-    for i, (month, temp) in enumerate(zip(months, temps)):
-        height_percent = ((temp - min_temp) / temp_range) * 180 + 30 if temp_range > 0 else 100
+    for month, temp in zip(months, temps):
+        height = ((temp - min_temp) / temp_range) * 180 + 30
         chart_html += f'''
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
-                <div style="width: 70%; background: #FF6B6B; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; opacity: 0.9; 
-                           box-shadow: 0 4px 12px rgba(255,107,107,0.3); 
-                           border: 1px solid rgba(255,255,255,0.1);
-                           transition: all 0.2s ease;" 
-                     title="{month}: {temp}°C"></div>
-                <div style="color: #FFFFFF; font-size: 0.9rem; margin-top: 10px; font-weight: 600;">{temp}°C</div>
-                <div style="color: #CCCCCC; font-size: 0.8rem; margin-top: 2px; font-weight: 500;">{month}</div>
+            <div style="flex:1; text-align:center;">
+                <div style="background:#FF6B6B; height:{height}px; width:70%; margin:0 auto; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{temp}°C</div>
+                <div style="color:#CCCCCC;">{month}</div>
             </div>
         '''
-    
-    chart_html += '''
-        </div>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: #FF6B6B; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">Mean Temperature (°C)</span>
-            </span>
-        </div>
-    </div>
-    '''
-    
+    chart_html += '</div></div>'
     return chart_html
 
 
 def create_precipitation_chart_html(df, location_name):
-    """Create a simple HTML precipitation chart"""
     months = df['month_name'].tolist()
     precip = df['total_precipitation'].tolist()
-    
     max_precip = max(precip) if max(precip) > 0 else 100
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Monthly Precipitation</h4>
-            {accuracy_badge_html("medium", "±20-40% CHIRPS")}
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; width: 100%;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Monthly Precipitation</h4>
+            {accuracy_badge_html("medium", "±20-40%")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 250px;">
     '''
-    
-    for i, (month, p) in enumerate(zip(months, precip)):
-        height_percent = (p / max_precip) * 200 if max_precip > 0 else 100
+    for month, p in zip(months, precip):
+        height = (p / max_precip) * 200
         chart_html += f'''
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
-                <div style="width: 70%; background: #4A90E2; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; opacity: 0.9; 
-                           box-shadow: 0 4px 12px rgba(74,144,226,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);
-                           transition: all 0.2s ease;" 
-                     title="{month}: {p:.1f}mm"></div>
-                <div style="color: #FFFFFF; font-size: 0.9rem; margin-top: 10px; font-weight: 600;">{p:.0f}mm</div>
-                <div style="color: #CCCCCC; font-size: 0.8rem; margin-top: 2px; font-weight: 500;">{month}</div>
+            <div style="flex:1; text-align:center;">
+                <div style="background:#4A90E2; height:{height}px; width:70%; margin:0 auto; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{p:.0f}mm</div>
+                <div style="color:#CCCCCC;">{month}</div>
             </div>
         '''
-    
-    chart_html += '''
-        </div>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: #4A90E2; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">Precipitation (mm)</span>
-            </span>
-        </div>
-    </div>
-    '''
-    
+    chart_html += '</div></div>'
     return chart_html
 
 
 def create_soil_moisture_chart_html(df, location_name):
-    """Create a simple HTML soil moisture chart"""
     months = df['month_name'].tolist()
     surface = df['soil_moisture_0_7cm'].tolist()
     root = df['soil_moisture_7_28cm'].tolist()
     deep = df['soil_moisture_28_100cm'].tolist()
-    
     max_value = max(max(surface), max(root), max(deep)) * 1.2
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Moisture by Layer</h4>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; width: 100%;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Soil Moisture</h4>
             {accuracy_badge_html("medium", "±0.05 m³/m³")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 250px;">
     '''
-    
     for i, month in enumerate(months):
-        surface_height = (surface[i] / max_value) * 200 if max_value > 0 else 50
-        root_height = (root[i] / max_value) * 200 if max_value > 0 else 50
-        deep_height = (deep[i] / max_value) * 200 if max_value > 0 else 50
-        
         chart_html += f'''
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
-                <div style="width: 100%; display: flex; flex-direction: column-reverse; gap: 2px; height: 200px;">
-                    <div style="width: 100%; background: #FFAA44; height: {deep_height}px; 
-                               border-radius: 6px 6px 0 0; 
-                               box-shadow: 0 2px 8px rgba(255,170,68,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);
-                               transition: all 0.2s ease;" 
-                         title="Deep: {deep[i]:.3f} m³/m³"></div>
-                    <div style="width: 100%; background: #4A90E2; height: {root_height}px; 
-                               border-radius: 6px 6px 0 0;
-                               box-shadow: 0 2px 8px rgba(74,144,226,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);
-                               transition: all 0.2s ease;" 
-                         title="Root: {root[i]:.3f} m³/m³"></div>
-                    <div style="width: 100%; background: #00FF88; height: {surface_height}px; 
-                               border-radius: 6px 6px 0 0;
-                               box-shadow: 0 2px 8px rgba(0,255,136,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);
-                               transition: all 0.2s ease;" 
-                         title="Surface: {surface[i]:.3f} m³/m³"></div>
+            <div style="flex:1; text-align:center;">
+                <div style="height:200px; display:flex; flex-direction:column-reverse; gap:2px;">
+                    <div style="background:#FFAA44; height:{(deep[i]/max_value)*200}px; border-radius:4px 4px 0 0;"></div>
+                    <div style="background:#4A90E2; height:{(root[i]/max_value)*200}px; border-radius:4px 4px 0 0;"></div>
+                    <div style="background:#00FF88; height:{(surface[i]/max_value)*200}px; border-radius:4px 4px 0 0;"></div>
                 </div>
-                <div style="color: #FFFFFF; font-size: 0.8rem; margin-top: 10px; font-weight: 500;">{month}</div>
+                <div style="color:#FFFFFF; margin-top:8px;">{month}</div>
             </div>
         '''
-    
-    chart_html += '''
-        </div>
-        <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A; flex-wrap: wrap;">
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: #00FF88; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">Surface (0-7cm)</span>
-            </span>
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: #4A90E2; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">Root (7-28cm)</span>
-            </span>
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: #FFAA44; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">Deep (28-100cm)</span>
-            </span>
-        </div>
-    </div>
-    '''
-    
-    return chart_html
-
-
-def create_soil_distribution_chart_html(df):
-    """Create a simple HTML soil distribution chart"""
-    surface_mean = df['soil_moisture_0_7cm'].mean()
-    root_mean = df['soil_moisture_7_28cm'].mean()
-    deep_mean = df['soil_moisture_28_100cm'].mean()
-    
-    max_val = max(surface_mean, root_mean, deep_mean)
-    
-    chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF; font-size: 1.1rem;">Average Soil Moisture Distribution</h4>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: center; gap: 3rem; height: 250px; margin: 20px 0;">
-    '''
-    
-    labels = ['Surface<br>0-7cm', 'Root Zone<br>7-28cm', 'Deep<br>28-100cm']
-    values = [surface_mean, root_mean, deep_mean]
-    colors = ['#00FF88', '#4A90E2', '#FFAA44']
-    
-    for label, value, color in zip(labels, values, colors):
-        height_percent = (value / max_val) * 200 if max_val > 0 else 100
-        chart_html += f'''
-            <div style="display: flex; flex-direction: column; align-items: center; width: 120px;">
-                <div style="width: 80px; background: {color}; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; margin-bottom: 15px; 
-                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);
-                           transition: all 0.2s ease;" 
-                     title="{value:.3f} m³/m³"></div>
-                <div style="color: #FFFFFF; font-weight: 700; font-size: 1.2rem; margin-bottom: 5px;">{value:.3f}</div>
-                <div style="color: #CCCCCC; font-size: 0.9rem; text-align: center;">{label}</div>
-            </div>
-        '''
-    
-    chart_html += '''
-        </div>
-        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
-            <span style="color: #CCCCCC; font-size: 0.9rem;">Units: m³/m³</span>
-        </div>
-    </div>
-    '''
-    
-    return chart_html
-
-
-def create_vegetation_chart_html(dates, values, index_name, location_name):
-    """Create a simple HTML vegetation index chart"""
-    max_val = max(values) if values else 1
-    min_val = min(values) if values else 0
-    val_range = max_val - min_val if max_val > min_val else 1
-    
-    color_map = {'NDVI': '#00FF88', 'EVI': '#FF6B6B', 'SAVI': '#4A90E2', 'NDWI': '#4A90E2', 
-                 'GNDVI': '#00CC6A', 'NBR': '#FF4444', 'SI': '#8B4513', 'NDSI_Salinity': '#DEB887', 'AWEI': '#87CEEB'}
-    color = color_map.get(index_name, '#00FF88')
-    
-    display_dates = dates[:12]
-    display_values = values[:12]
-    
-    chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">{index_name} Time Series (12 months)</h4>
-            {accuracy_badge_html("high", "±0.05 Sentinel-2")}
-        </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 4px; margin: 20px 0; padding: 0 5px;">
-    '''
-    
-    for date, val in zip(display_dates, display_values):
-        height_percent = ((val - min_val) / val_range) * 200 + 30 if val_range > 0 else 100
-        short_date = date[-2:]
-        chart_html += f'''
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
-                <div style="width: 70%; background: {color}; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; opacity: 0.9; 
-                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);
-                           transition: all 0.2s ease;" 
-                     title="{date}: {val:.3f}"></div>
-                <div style="color: #FFFFFF; font-size: 0.8rem; margin-top: 8px; font-weight: 600;">{val:.3f}</div>
-                <div style="color: #CCCCCC; font-size: 0.7rem; margin-top: 2px;">{short_date}</div>
-            </div>
-        '''
-    
-    chart_html += f'''
-        </div>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
-            <span style="display: flex; align-items: center; gap: 0.3rem;">
-                <span style="width: 16px; height: 16px; background: {color}; border-radius: 4px; display: inline-block;"></span>
-                <span style="color: #CCCCCC; font-size: 0.9rem;">{index_name}</span>
-            </span>
-        </div>
-    </div>
-    '''
-    
+    chart_html += '</div></div>'
     return chart_html
 
 
 def create_soil_texture_chart_html(soil_data, location_name):
-    """Create a simple HTML soil texture chart"""
     clay = soil_data['clay_content']
     silt = soil_data['silt_content']
     sand = soil_data['sand_content']
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Texture Composition</h4>
-            {accuracy_badge_html("medium", "±25% ISDASoil")}
-        </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: center; gap: 3rem; height: 250px; margin: 20px 0;">
-    '''
-    
-    components = [
-        {'name': 'Clay', 'value': clay, 'color': '#8B4513'},
-        {'name': 'Silt', 'value': silt, 'color': '#DEB887'},
-        {'name': 'Sand', 'value': sand, 'color': '#F4A460'}
-    ]
-    
-    for comp in components:
-        height_percent = comp['value'] * 2.5
-        chart_html += f'''
-            <div style="display: flex; flex-direction: column; align-items: center; width: 120px;">
-                <div style="width: 80px; background: {comp['color']}; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; margin-bottom: 15px; 
-                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);
-                           transition: all 0.2s ease;" 
-                     title="{comp['name']}: {comp['value']}%"></div>
-                <div style="color: #FFFFFF; font-weight: 700; font-size: 1.4rem; margin-bottom: 5px;">{comp['value']}%</div>
-                <div style="color: #CCCCCC; font-size: 1rem;">{comp['name']}</div>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; width: 100%;">
+        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF;">Soil Texture</h4>
+        <div style="display: flex; justify-content: center; gap: 2rem; height: 250px;">
+            <div style="text-align:center;">
+                <div style="background:#8B4513; height:{clay*2.5}px; width:80px; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{clay}%</div>
+                <div style="color:#CCCCCC;">Clay</div>
             </div>
-        '''
-    
-    chart_html += '''
+            <div style="text-align:center;">
+                <div style="background:#DEB887; height:{silt*2.5}px; width:80px; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{silt}%</div>
+                <div style="color:#CCCCCC;">Silt</div>
+            </div>
+            <div style="text-align:center;">
+                <div style="background:#F4A460; height:{sand*2.5}px; width:80px; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{sand}%</div>
+                <div style="color:#CCCCCC;">Sand</div>
+            </div>
         </div>
     </div>
     '''
-    
     return chart_html
 
 
 def create_som_gauge_html(soil_data, location_name):
-    """Create a simple HTML gauge for soil organic matter"""
-    som_value = soil_data['final_som_estimate']
-    
-    if som_value < 1.5:
+    som = soil_data['final_som_estimate']
+    if som < 1.5:
         color = '#FF4444'
         status = "Depleted"
-    elif som_value < 3:
+    elif som < 3:
         color = '#FFAA44'
         status = "Moderate"
     else:
         color = '#44FF44'
         status = "Rich"
     
-    percentage = (som_value / 6) * 100
-    
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Organic Matter</h4>
-            {accuracy_badge_html("medium", "±20% GSOC")}
-        </div>
-        <div style="text-align: center;">
-            <div style="position: relative; width: 250px; height: 125px; margin: 0 auto; overflow: hidden;">
-                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 125px; 
-                           background: linear-gradient(90deg, #FF4444 0%, #FFAA44 50%, #44FF44 100%);
-                           border-radius: 125px 125px 0 0; opacity: 0.3;"></div>
-                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 6px; height: 125px; 
-                           background: white; transform: translateX(-3px); box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
-                <div style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); 
-                           background: {color}; padding: 10px 25px; border-radius: 30px;
-                           box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
-                    <div style="color: white; font-size: 1.8rem; font-weight: 700;">{som_value:.2f}%</div>
-                </div>
-            </div>
-            <div style="margin-top: 20px;">
-                <span style="color: {color}; font-size: 1.2rem; font-weight: 600;">{status}</span>
-            </div>
-            <div style="display: flex; justify-content: space-between; color: #CCCCCC; font-size: 0.9rem; margin-top: 15px; padding: 0 20px;">
-                <span>Depleted<br>< 1.5%</span>
-                <span>Moderate<br>1.5-3%</span>
-                <span>Rich<br>> 3%</span>
-            </div>
-        </div>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; text-align:center;">
+        <h4 style="color: #FFFFFF; margin-bottom: 1rem;">Soil Organic Matter</h4>
+        <div style="font-size: 3rem; color: {color}; font-weight: bold;">{som:.2f}%</div>
+        <div style="color: {color}; font-size: 1.2rem; margin-top: 0.5rem;">{status}</div>
     </div>
     '''
-    
     return chart_html
 
 
-def create_climate_temp_gauge_html(climate_data):
-    """Create a simple HTML gauge for temperature"""
-    temp = climate_data['mean_temperature']
+def create_vegetation_chart_html(dates, values, index_name, location_name):
+    max_val = max(values) if values else 1
+    min_val = min(values) if values else 0
+    val_range = max_val - min_val if max_val > min_val else 1
     
-    if temp < 0:
-        color = '#4A90E2'
-        status = "Cold"
-    elif temp < 18:
-        color = '#44AA44'
-        status = "Temperate"
-    elif temp < 30:
-        color = '#FFAA44'
-        status = "Warm"
-    else:
-        color = '#FF4444'
-        status = "Hot"
-    
-    percentage = ((temp + 20) / 65) * 100
+    color_map = {'NDVI': '#00FF88', 'EVI': '#FF6B6B', 'SAVI': '#4A90E2', 'NDWI': '#4A90E2', 'GNDVI': '#00CC6A'}
+    color = color_map.get(index_name, '#00FF88')
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF; font-size: 1.1rem;">Mean Annual Temperature</h4>
-        <div style="text-align: center;">
-            <div style="position: relative; width: 200px; height: 100px; margin: 0 auto; overflow: hidden;">
-                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; 
-                           background: linear-gradient(90deg, #4A90E2 0%, #44AA44 30%, #FFAA44 70%, #FF4444 100%);
-                           border-radius: 100px 100px 0 0; opacity: 0.3;"></div>
-                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 4px; height: 100px; 
-                           background: white; transform: translateX(-2px); box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
-            </div>
-            <div style="margin-top: 20px;">
-                <span style="color: {color}; font-size: 2rem; font-weight: 700;">{temp:.1f}°C</span>
-                <div style="color: {color}; font-size: 1rem; margin-top: 5px;">{status}</div>
-            </div>
-        </div>
-    </div>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; width: 100%;">
+        <h4 style="color: #FFFFFF; margin-bottom: 1rem;">{index_name} Time Series</h4>
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 250px;">
     '''
-    
+    for date, val in zip(dates[:12], values[:12]):
+        height = ((val - min_val) / val_range) * 200 + 30
+        chart_html += f'''
+            <div style="flex:1; text-align:center;">
+                <div style="background:{color}; height:{height}px; width:70%; margin:0 auto; border-radius:8px 8px 0 0;"></div>
+                <div style="color:#FFFFFF; margin-top:8px;">{val:.3f}</div>
+                <div style="color:#CCCCCC;">{date[-2:]}</div>
+            </div>
+        '''
+    chart_html += '</div></div>'
     return chart_html
 
-
-def create_climate_precip_gauge_html(climate_data):
-    """Create a simple HTML gauge for precipitation"""
-    precip = climate_data['mean_precipitation']
-    
-    if precip < 250:
-        color = '#FF4444'
-        status = "Arid"
-    elif precip < 500:
-        color = '#FFAA44'
-        status = "Semi-arid"
-    elif precip < 1000:
-        color = '#44AA44'
-        status = "Sub-humid"
-    elif precip < 2000:
-        color = '#4A90E2'
-        status = "Humid"
-    else:
-        color = '#800080'
-        status = "Very Humid"
-    
-    percentage = (precip / 3000) * 100
-    
-    chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
-        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF; font-size: 1.1rem;">Annual Precipitation</h4>
-        <div style="text-align: center;">
-            <div style="position: relative; width: 200px; height: 100px; margin: 0 auto; overflow: hidden;">
-                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; 
-                           background: linear-gradient(90deg, #FF4444 0%, #FFAA44 20%, #44AA44 40%, #4A90E2 70%, #800080 90%);
-                           border-radius: 100px 100px 0 0; opacity: 0.3;"></div>
-                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 4px; height: 100px; 
-                           background: white; transform: translateX(-2px); box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
-            </div>
-            <div style="margin-top: 20px;">
-                <span style="color: {color}; font-size: 2rem; font-weight: 700;">{precip:.0f} mm</span>
-                <div style="color: {color}; font-size: 1rem; margin-top: 5px;">{status}</div>
-            </div>
-        </div>
-    </div>
-    '''
-    
-    return chart_html
-
-
-# =============================================================================
-# HELPER FUNCTION FOR CHART DISPLAY
-# =============================================================================
 
 def display_chart(chart_html):
-    """Helper function to properly display HTML charts using components"""
     if chart_html and len(chart_html) > 100:
         st.components.v1.html(chart_html, height=400, scrolling=False)
-    else:
-        st.error("Chart failed to render")
 
 
 # =============================================================================
-# AI INTERPRETATION DISPLAY - FIXED VERSION WITH INSTALLATION HELP
+# AI INTERPRETATION DISPLAY
 # =============================================================================
 
 def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tinyllama=True):
     ct = chart_type.lower()
-    
-    # Debug print
-    print(f"show_ai_interpretation called for {chart_type}")
-    print(f"  use_tinyllama: {use_tinyllama}")
-    print(f"  llm is None: {llm is None}")
-    print(f"  LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
 
     if "climate classification" in ct:
         label = "🌾 Field Briefing — Agroclimate Assessment"
-    elif "monthly temperature" in ct and "vegetation" not in ct:
+    elif "monthly temperature" in ct:
         label = "🌾 Crop Calendar Analysis"
-    elif "precipitation" in ct and "vegetation" not in ct:
+    elif "precipitation" in ct:
         label = "🌾 Water Management Assessment"
-    elif "soil moisture" in ct and "distribution" not in ct:
+    elif "soil moisture" in ct:
         label = "🌾 Root-Zone Water Status"
-    elif "distribution" in ct:
-        label = "🌾 Soil Profile Hydrology"
-    elif "soil texture" in ct or "texture composition" in ct:
+    elif "soil texture" in ct:
         label = "🌾 Soil Texture & Workability"
-    elif "organic matter" in ct or "som" in ct:
+    elif "organic matter" in ct:
         label = "🌾 Carbon & Fertility Status"
     elif "ndvi" in ct:
         label = "🌾 NDVI Vegetation Health Signal"
@@ -1176,10 +1048,6 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
         label = "🌾 Soil-Adjusted Vegetation Cover"
     elif "gndvi" in ct:
         label = "🌾 Chlorophyll & Nitrogen Proxy"
-    elif "temperature" in ct and "vegetation" in ct:
-        label = "🌾 Thermal Growing Season"
-    elif "precipitation" in ct and "vegetation" in ct:
-        label = "🌾 Rainfall–Vegetation Coupling"
     else:
         label = "🌾 AI Data Insight"
 
@@ -1192,46 +1060,31 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     </div>
     ''', unsafe_allow_html=True)
     
-    if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
-        print("✅ Attempting TinyLlama inference")
+    if use_tinyllama and llm is not None:
         with st.spinner("🦙 TinyLlama is analyzing..."):
             tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
         if tl_result:
-            print("✅ TinyLlama succeeded")
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
                 f'<span style="font-size:1.2rem;">🦙</span>'
                 f'<span style="color:#00FF88;font-weight:600;font-size:0.85rem;">TinyLlama 1.1B</span>'
-                f'<span style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);'
-                f'border-radius:20px;padding:1px 8px;font-size:0.7rem;color:#00FF88;">AI</span>'
                 f'</div>',
                 unsafe_allow_html=True
             )
             st.markdown(f'<div class="ai-interpretation">{tl_result}</div>', unsafe_allow_html=True)
         else:
-            print("❌ TinyLlama failed, using fallback")
             rule_based = get_smart_interpretation(chart_type, data_summary, location)
             st.markdown(
-                '<div style="color:#FFAA44;font-size:0.8rem;margin-bottom:0.4rem;">⚠️ TinyLlama inference failed — showing rule-based analysis</div>',
+                '<div style="color:#FFAA44;font-size:0.8rem;margin-bottom:0.4rem;">⚠️ Using rule-based analysis</div>',
                 unsafe_allow_html=True
             )
             st.markdown(f'<div class="ai-interpretation">{rule_based}</div>', unsafe_allow_html=True)
     else:
-        print("⚠️ Using rule-based fallback")
         rule_based = get_smart_interpretation(chart_type, data_summary, location)
-        
-        if not LLAMA_AVAILABLE:
-            ai_source = "🤖 GIS Intelligence Engine"
-            install_message = " (TinyLlama not installed - click sidebar to install)"
-        else:
-            ai_source = "🤖 GIS Intelligence Engine"
-            install_message = ""
-        
         st.markdown(
             f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
             f'<span style="font-size:1.1rem;">🤖</span>'
-            f'<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">{ai_source}</span>'
-            f'<span style="color:#FFAA44;font-size:0.8rem;">{install_message}</span>'
+            f'<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">GIS Intelligence Engine</span>'
             f'</div>',
             unsafe_allow_html=True
         )
@@ -1262,7 +1115,7 @@ def init_session():
         "tinyllama_loaded": False,
         "tinyllama_download_attempted": False,
         "llm_instance": None,
-        "installation_attempted": False,
+        "use_small_model": False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1270,40 +1123,17 @@ def init_session():
 
 init_session()
 
+
 # =============================================================================
 # MAP HTML
 # =============================================================================
 
 def map_iframe(center_lat=20, center_lon=10, zoom=2):
     return f'''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
-        <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-        <style>
-            body {{ margin: 0; padding: 0; background: #0A0A0A; }}
-            #map {{ width: 100%; height: 460px; border-radius: 14px; }}
-        </style>
-    </head>
-    <body>
-        <div id="map"></div>
-        <script>
-            mapboxgl.accessToken = 'pk.eyJ1IjoiYnJ5Y2VseW5uMjUiLCJhIjoiY2x1a2lmcHh5MGwycTJrbzZ4YXVrb2E0aiJ9.LXbneMJJ6OosHv9ibtI5XA';
-            const map = new mapboxgl.Map({{
-                container: 'map',
-                style: 'mapbox://styles/mapbox/satellite-streets-v12',
-                center: [{center_lon}, {center_lat}],
-                zoom: {zoom},
-                pitch: 0
-            }});
-            map.addControl(new mapboxgl.NavigationControl({{ showCompass: true, showZoom: true }}), 'top-right');
-        </script>
-    </body>
-    </html>
+    <iframe src="https://maps.google.com/maps?q={center_lat},{center_lon}&z={zoom}&output=embed" 
+            width="100%" height="460" style="border:0; border-radius:14px;" allowfullscreen></iframe>
     '''
+
 
 # =============================================================================
 # PROGRESS BAR
@@ -1318,105 +1148,41 @@ def progress_bar_html(step):
     html = '<div style="display:flex; gap:0.5rem; margin-bottom:1rem;">'
     for i, label in enumerate(labels, 1):
         if i < step:
-            cls = "completed"
             icon = "✓"
+            bg = "#00CC6A"
         elif i == step:
-            cls = "active"
             icon = str(i)
+            bg = "#00FF88"
         else:
-            cls = ""
             icon = str(i)
-        active_color = "#00FF88" if cls == "active" else ("#00CC6A" if cls == "completed" else "#2A2A2A")
-        text_col = "#0A0A0A" if cls in ["active", "completed"] else "#999999"
-        label_col = "#00FF88" if cls == "active" else "#CCCCCC"
+            bg = "#2A2A2A"
         html += f'''
-        <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
-            <div style="width:34px;height:34px;border-radius:50%;background:{active_color};display:flex;align-items:center;justify-content:center;color:{text_col};font-weight:700;font-size:0.85rem;margin-bottom:0.4rem;">{icon}</div>
-            <span style="font-size:0.7rem;color:{label_col};text-align:center;">{label}</span>
+        <div style="flex:1; text-align:center;">
+            <div style="width:34px;height:34px;border-radius:50%;background:{bg};margin:0 auto;color:#0A0A0A;font-weight:700;line-height:34px;">{icon}</div>
+            <div style="color:#CCCCCC;font-size:0.7rem;margin-top:0.4rem;">{label}</div>
         </div>'''
     html += '</div>'
     return html
+
 
 # =============================================================================
 # MAIN UI
 # =============================================================================
 
-# Debug sidebar
+# Sidebar
 with st.sidebar:
-    st.markdown("### 🐛 Debug Info")
-    st.write(f"LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
-    st.write(f"Model exists: {MODEL_PATH.exists()}")
-    if MODEL_PATH.exists():
-        st.write(f"Model size: {MODEL_PATH.stat().st_size / (1024**2):.1f} MB")
-    st.write(f"tinyllama_loaded: {st.session_state.tinyllama_loaded}")
-    st.write(f"tinyllama_enabled: {st.session_state.tinyllama_enabled}")
-    st.write(f"Current step: {st.session_state.current_step}")
-    st.write(f"LLM in session state: {st.session_state.llm_instance is not None}")
-    
-    st.markdown("### 🔧 Installation Helper")
-    
-    if not LLAMA_AVAILABLE:
-        st.error("❌ llama-cpp-python is NOT installed")
-        
-        # Installation instructions
-        with st.expander("📦 Click to install TinyLlama", expanded=True):
-            st.markdown("""
-            <div class="install-instructions">
-                <h4 style="color:#00FF88;">Installation Steps:</h4>
-                <p>1. Open your terminal/command prompt</p>
-                <p>2. Run this command:</p>
-                <div class="install-code">pip install llama-cpp-python</div>
-                <p>3. Restart this app after installation</p>
-                <p style="color:#FFAA44; margin-top:10px;">⚠️ This may take a few minutes</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Try auto-install button
-            if st.button("🔄 Try Auto-Install", use_container_width=True):
-                with st.spinner("Installing llama-cpp-python..."):
-                    st.session_state.installation_attempted = True
-                    success, message = install_llama_cpp()
-                    if success:
-                        st.success(message)
-                        st.info("Please restart the app manually")
-                    else:
-                        st.error(f"Auto-install failed: {message}")
-                        st.info("Please install manually using the command above")
-    else:
-        st.success("✅ llama-cpp-python is installed!")
-        
-        if not MODEL_PATH.exists():
-            st.warning("⚠️ Model file not downloaded yet")
-            if st.button("📥 Download TinyLlama Model", use_container_width=True):
-                st.session_state.tinyllama_download_attempted = True
-                pb = st.progress(0)
-                st_txt = st.empty()
-                ok, err = download_model_with_progress(pb, st_txt)
-                pb.empty()
-                st_txt.empty()
-                if ok:
-                    st.success("✅ Model downloaded! Loading...")
-                    st.rerun()
-                else:
-                    st.error(f"Download failed: {err}")
-        elif not st.session_state.tinyllama_loaded:
-            st.info("🦙 Model on disk — ready to load")
-            if st.button("🔄 Load Model", use_container_width=True):
-                with st.spinner("Loading TinyLlama..."):
-                    _llm, _err = load_tinyllama_model()
-                    if _llm:
-                        st.session_state.tinyllama_loaded = True
-                        st.session_state.tinyllama_enabled = True
-                        st.session_state.llm_instance = _llm
-                        st.success("✅ Model loaded!")
-                        st.rerun()
-                    else:
-                        st.error(f"Failed: {_err}")
+    st.markdown("### 🦙 TinyLlama Status")
+    if LLAMA_AVAILABLE:
+        if MODEL_PATH.exists() or SMALL_MODEL_PATH.exists():
+            st.success("✅ llama-cpp-python installed")
+            if st.session_state.llm_instance is not None:
+                st.success("✅ Model loaded")
+            else:
+                st.warning("⚠️ Model not loaded")
         else:
-            st.success("✅ TinyLlama is loaded and ready!")
-            st.session_state.tinyllama_enabled = st.toggle(
-                "Enable AI Analysis", value=st.session_state.tinyllama_enabled
-            )
+            st.info("📥 Model not downloaded")
+    else:
+        st.error("❌ llama-cpp-python not installed")
     
     st.markdown("---")
     st.markdown("### ⚙️ Settings")
@@ -1433,27 +1199,70 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# AUTO-LOAD TINYLLAMA ON STARTUP (if already installed and model exists)
+# MODEL DOWNLOAD UI
 # =============================================================================
 
-# Initialize llm from session state
 llm = st.session_state.llm_instance
 
-# Auto-load if conditions are met
-if LLAMA_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_loaded and not st.session_state.installation_attempted:
-    with st.spinner("🦙 Auto-loading TinyLlama model..."):
-        _llm, _err = load_tinyllama_model()
-        if _llm:
-            st.session_state.tinyllama_loaded = True
-            st.session_state.tinyllama_enabled = True
-            st.session_state.llm_instance = _llm
-            llm = _llm
-            st.success("🦙 TinyLlama loaded automatically!")
-        else:
-            st.warning(f"⚠️ Auto-load failed: {_err}")
+if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not SMALL_MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
+    st.markdown("""
+    <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);
+         border-radius:12px;padding:1.5rem;margin-bottom:1rem;text-align:center;">
+        <span style="font-size:3rem;">🦙</span>
+        <h3 style="color:#00FF88; margin:0.5rem 0;">Download TinyLlama Model</h3>
+        <p style="color:#CCCCCC; margin-bottom:1.5rem;">Choose a model size:</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📦 Standard (637MB)", use_container_width=True):
+            st.session_state.tinyllama_download_attempted = True
+            st.session_state.use_small_model = False
+            pb = st.progress(0)
+            st_txt = st.empty()
+            ok, err = download_model_with_progress(pb, st_txt, use_small_model=False)
+            if ok:
+                _llm, _ = load_tinyllama_model()
+                if _llm:
+                    st.session_state.llm_instance = _llm
+                    st.session_state.tinyllama_loaded = True
+                    st.success("✅ Model downloaded and loaded!")
+                    st.rerun()
+            else:
+                st.error(f"Download failed: {err}")
+    
+    with col2:
+        if st.button("📦 Small (300MB)", use_container_width=True):
+            st.session_state.tinyllama_download_attempted = True
+            st.session_state.use_small_model = True
+            pb = st.progress(0)
+            st_txt = st.empty()
+            ok, err = download_model_with_progress(pb, st_txt, use_small_model=True)
+            if ok:
+                _llm, _ = load_tinyllama_model()
+                if _llm:
+                    st.session_state.llm_instance = _llm
+                    st.session_state.tinyllama_loaded = True
+                    st.success("✅ Small model downloaded and loaded!")
+                    st.rerun()
+            else:
+                st.error(f"Download failed: {err}")
 
+elif LLAMA_AVAILABLE and (MODEL_PATH.exists() or SMALL_MODEL_PATH.exists()) and st.session_state.llm_instance is None:
+    with st.spinner("🦙 Loading TinyLlama model..."):
+        _llm, _ = load_tinyllama_model()
+        if _llm:
+            st.session_state.llm_instance = _llm
+            st.session_state.tinyllama_loaded = True
+            llm = _llm
+            st.success("✅ TinyLlama loaded successfully!")
+            st.rerun()
+
+# Progress bar
 st.markdown(progress_bar_html(st.session_state.current_step), unsafe_allow_html=True)
 
+# Main content columns
 col1, col2 = st.columns([1, 2])
 
 with col1:
@@ -1465,14 +1274,14 @@ with col1:
         country = st.selectbox("🌍 Country", [""] + sorted(WORLD_REGIONS.keys()))
         if country:
             regions = WORLD_REGIONS[country]["regions"]
-            region = st.selectbox("📌 Region / Province", [""] + regions)
+            region = st.selectbox("📌 Region", [""] + regions)
         else:
             region = None
 
         if st.button("✅ Confirm Location", use_container_width=True):
             if country:
                 st.session_state.selected_country = country
-                st.session_state.selected_region = region if region else None
+                st.session_state.selected_region = region
                 location_name = f"{region}, {country}" if region else country
                 st.session_state.location_name = location_name
                 st.session_state.region_type = get_region_type(location_name)
@@ -1490,19 +1299,13 @@ with col1:
         if st.session_state.analysis_type == "Climate & Soil":
             st.markdown('<div class="card-header"><div class="card-icon">🌤️</div><h3 style="margin:0;">Climate Settings</h3></div>', unsafe_allow_html=True)
             st.info(f"📍 **{location_name}**")
-            region_type = st.session_state.region_type
-            if region_type in ["Semi-arid", "Arid"]:
-                st.markdown(f"""<div style="background:rgba(255,170,68,0.1);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
-                    <p style="color:#FFAA44;margin:0;font-size:0.85rem;">⚠️ <strong>{region_type} Region Detected</strong><br>CHIRPS may overestimate in arid regions. Calibration recommended: 0.7–0.8×</p></div>""", unsafe_allow_html=True)
-                precip_scale = st.slider("💧 Precipitation Calibration", 0.5, 1.0, 0.75, 0.05)
-            else:
-                precip_scale = st.slider("💧 Precipitation Calibration", 0.5, 1.5, 1.0, 0.05)
+            precip_scale = st.slider("💧 Precipitation Calibration", 0.5, 1.5, 1.0, 0.05)
             st.session_state.precip_scale = precip_scale
         else:
             st.markdown('<div class="card-header"><div class="card-icon">🌿</div><h3 style="margin:0;">Vegetation Settings</h3></div>', unsafe_allow_html=True)
             st.info(f"📍 **{location_name}**")
             st.session_state.collection_choice = st.selectbox("🛰️ Satellite", ["Sentinel-2", "Landsat-8"])
-            st.session_state.selected_indices = st.multiselect("📊 Select Indices", VEGETATION_INDICES, default=["NDVI", "EVI", "SAVI", "NDWI", "GNDVI"])
+            st.session_state.selected_indices = st.multiselect("📊 Indices", VEGETATION_INDICES, default=["NDVI", "EVI", "SAVI"])
 
         cb, cn = st.columns(2)
         with cb:
@@ -1510,7 +1313,7 @@ with col1:
                 st.session_state.current_step = 1
                 st.rerun()
         with cn:
-            if st.button("✅ Save & Continue", use_container_width=True):
+            if st.button("✅ Continue", use_container_width=True):
                 st.session_state.current_step = 3
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1523,20 +1326,11 @@ with col1:
         if st.session_state.analysis_type == "Climate & Soil":
             st.markdown('<div class="card-header"><div class="card-icon">🌱</div><h3 style="margin:0;">Soil Settings</h3></div>', unsafe_allow_html=True)
             st.info(f"📍 **{location_name}**")
-            st.markdown("""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
-                <p style="color:#CCCCCC;margin:0;font-size:0.85rem;"><strong>📊 Soil Data Sources:</strong><br>
-                • ISDAsoil (Africa) / GSOC (Global): Soil organic carbon<br>
-                • OpenLandMap: Soil texture classes<br>
-                • Depth: 20cm (Africa) / 30cm (Global)</p></div>""", unsafe_allow_html=True)
         else:
-            st.markdown('<div class="card-header"><div class="card-icon">🗺️</div><h3 style="margin:0;">Analysis Preview</h3></div>', unsafe_allow_html=True)
+            st.markdown('<div class="card-header"><div class="card-icon">🗺️</div><h3 style="margin:0;">Preview</h3></div>', unsafe_allow_html=True)
             st.info(f"📍 **{location_name}**")
-            indices_str = ", ".join(st.session_state.selected_indices[:5])
-            if len(st.session_state.selected_indices) > 5:
-                indices_str += "..."
-            st.markdown(f"""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
-                <p style="color:#CCCCCC;margin:0;font-size:0.85rem;"><strong>🛰️ Satellite:</strong> {st.session_state.collection_choice}<br>
-                <strong>📊 Indices:</strong> {indices_str}<br><strong>📅 Period:</strong> 2023–2025</p></div>""", unsafe_allow_html=True)
+            indices_str = ", ".join(st.session_state.selected_indices[:3])
+            st.markdown(f"**Selected Indices:** {indices_str}")
 
         cb, cn = st.columns(2)
         with cb:
@@ -1545,16 +1339,14 @@ with col1:
                 st.rerun()
         with cn:
             if st.button("🚀 Run Analysis", type="primary", use_container_width=True):
-                location_name = st.session_state.get("location_name", "Unknown")
-                region_type = st.session_state.get("region_type", "general")
-                with st.spinner("Generating analysis data..."):
-                    st.session_state.climate_df = generate_climate_data(location_name, region_type=region_type)
-                    st.session_state.soil_data = get_soil_data(location_name, region_type)
-                    st.session_state.climate_classification = get_climate_classification(location_name, region_type)
+                with st.spinner("Generating analysis..."):
+                    st.session_state.climate_df = generate_climate_data(location_name, region_type=st.session_state.region_type)
+                    st.session_state.soil_data = get_soil_data(location_name, st.session_state.region_type)
+                    st.session_state.climate_classification = get_climate_classification(location_name, st.session_state.region_type)
                     if st.session_state.analysis_type == "Vegetation & Climate":
                         results = {}
                         for idx in st.session_state.selected_indices:
-                            dates, values = generate_vegetation_data(location_name, idx, months=24)
+                            dates, values = generate_vegetation_data(location_name, idx)
                             results[idx] = {"dates": dates, "values": values}
                         st.session_state.vegetation_results = results
                 st.session_state.current_step = 4
@@ -1568,20 +1360,9 @@ with col1:
         st.markdown('<div class="card-header"><div class="card-icon">📊</div><h3 style="margin:0;">Results</h3></div>', unsafe_allow_html=True)
         st.success(f"✅ Analysis complete for **{location_name}**")
 
-        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and st.session_state.llm_instance is not None and LLAMA_AVAILABLE) else "🤖 GIS Intelligence"
-        
-        if not LLAMA_AVAILABLE:
-            ai_note = " (TinyLlama not installed - see sidebar for installation)"
-        elif st.session_state.llm_instance is None and MODEL_PATH.exists():
-            ai_note = " (Model not loaded - click Load Model in sidebar)"
-        elif not MODEL_PATH.exists():
-            ai_note = " (Model not downloaded - click Download in sidebar)"
-        else:
-            ai_note = ""
-            
+        ai_status = "🦙 TinyLlama" if st.session_state.llm_instance is not None else "🤖 GIS Intelligence"
         st.markdown(f"""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
-            <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">{ai_status}{ai_note}<br>
-            📈 <strong>Charts with AI interpretation</strong> are shown on the right.</p></div>""", unsafe_allow_html=True)
+            <p style="color:#CCCCCC;margin:0;">{ai_status}: Ready</p></div>""", unsafe_allow_html=True)
 
         cb, cn = st.columns(2)
         with cb:
@@ -1609,146 +1390,126 @@ with col2:
         st.markdown('</div>', unsafe_allow_html=True)
 
     elif st.session_state.current_step == 4:
-        location_name = st.session_state.get("location_name", "Unknown")
-        region_type = st.session_state.get("region_type", "general")
-        climate_df = st.session_state.get("climate_df")
-        soil_data = st.session_state.get("soil_data")
-        climate_cls = st.session_state.get("climate_classification")
-        veg_results = st.session_state.get("vegetation_results")
-        
-        # Get llm from session state
+        location_name = st.session_state.location_name
+        climate_df = st.session_state.climate_df
+        soil_data = st.session_state.soil_data
+        climate_cls = st.session_state.climate_classification
+        veg_results = st.session_state.vegetation_results
         llm = st.session_state.llm_instance
-        use_tl = st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE
+        use_tl = st.session_state.llm_instance is not None
 
         if st.session_state.analysis_type == "Climate & Soil":
             # Climate Classification
-            with st.container():
-                st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                st.markdown('<div style="margin-bottom:1rem;"><h3 style="margin:0;">🌤️ Climate Classification</h3></div>', unsafe_allow_html=True)
-                if climate_cls:
+            if climate_cls:
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<h3 style="margin:0 0 1rem 0;">🌤️ Climate Classification</h3>', unsafe_allow_html=True)
+                    
                     col_m1, col_m2 = st.columns(2)
                     with col_m1:
-                        st.metric("🌡️ Mean Annual Temp", f"{climate_cls['mean_temperature']:.1f}°C")
+                        st.metric("Mean Annual Temp", f"{climate_cls['mean_temperature']:.1f}°C")
                     with col_m2:
-                        st.metric("💧 Annual Precip", f"{climate_cls['mean_precipitation']:.0f} mm")
+                        st.metric("Annual Precip", f"{climate_cls['mean_precipitation']:.0f} mm")
+                    
                     st.info(f"**Climate Zone:** {climate_cls['climate_zone']}")
                     
-                    col_g1, col_g2 = st.columns(2)
-                    with col_g1:
-                        temp_gauge = create_climate_temp_gauge_html(climate_cls)
-                        if temp_gauge:
-                            display_chart(temp_gauge)
-                    with col_g2:
-                        precip_gauge = create_climate_precip_gauge_html(climate_cls)
-                        if precip_gauge:
-                            display_chart(precip_gauge)
-                    
-                    arid = climate_cls.get('aridity_index', 0)
-                    water_stress = "severe drought stress" if arid < 0.5 else ("moderate water stress" if arid < 1.0 else ("balanced water regime" if arid < 2.0 else "humid surplus"))
                     data_summary = (
                         f"Climate zone: {climate_cls['climate_zone']}, "
-                        f"Mean annual temperature: {climate_cls['mean_temperature']:.1f}°C, "
-                        f"Annual precipitation: {climate_cls['mean_precipitation']:.0f}mm, "
-                        f"Aridity index: {arid:.2f} ({water_stress})"
+                        f"Mean temperature: {climate_cls['mean_temperature']:.1f}°C, "
+                        f"Annual precipitation: {climate_cls['mean_precipitation']:.0f}mm"
                     )
-                    show_ai_interpretation("Climate Classification gauge", data_summary, location_name, llm, use_tl)
-                st.markdown('</div>', unsafe_allow_html=True)
+                    show_ai_interpretation("Climate Classification", data_summary, location_name, llm, use_tl)
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-            # ... (rest of the chart display code remains the same) ...
-            # For brevity, I'm not repeating all the chart display sections, but they should remain unchanged
+            # Climate Data
+            if climate_df is not None:
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<h3 style="margin:0 0 1rem 0;">📊 Climate Data</h3>', unsafe_allow_html=True)
+                    
+                    tab1, tab2, tab3 = st.tabs(["🌡️ Temperature", "💧 Precipitation", "🌱 Soil Moisture"])
 
-            # Note: The complete code would include all the chart display sections from the original
-            # I've truncated here for brevity, but they should be copied from the original code
+                    with tab1:
+                        temp_chart = create_temperature_chart_html(climate_df, location_name)
+                        display_chart(temp_chart)
+                        
+                        temps = climate_df['temperature_2m'].tolist()
+                        data_summary = f"Monthly temperatures from {min(temps):.1f}°C to {max(temps):.1f}°C"
+                        show_ai_interpretation("Monthly Temperature", data_summary, location_name, llm, use_tl)
+
+                    with tab2:
+                        precip_chart = create_precipitation_chart_html(climate_df, location_name)
+                        display_chart(precip_chart)
+                        
+                        annual = climate_df['total_precipitation'].sum()
+                        data_summary = f"Annual total precipitation: {annual:.0f}mm"
+                        show_ai_interpretation("Precipitation", data_summary, location_name, llm, use_tl)
+
+                    with tab3:
+                        soil_chart = create_soil_moisture_chart_html(climate_df, location_name)
+                        display_chart(soil_chart)
+                        
+                        surface = climate_df['soil_moisture_0_7cm'].mean()
+                        root = climate_df['soil_moisture_7_28cm'].mean()
+                        deep = climate_df['soil_moisture_28_100cm'].mean()
+                        data_summary = f"Surface: {surface:.3f}, Root: {root:.3f}, Deep: {deep:.3f} m³/m³"
+                        show_ai_interpretation("Soil Moisture", data_summary, location_name, llm, use_tl)
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            # Soil Properties
+            if soil_data:
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<h3 style="margin:0 0 1rem 0;">🌱 Soil Properties</h3>', unsafe_allow_html=True)
+                    
+                    col_p1, col_p2, col_p3 = st.columns(3)
+                    with col_p1: 
+                        st.metric("Texture", soil_data['texture_name'])
+                    with col_p2: 
+                        st.metric("SOM", f"{soil_data['final_som_estimate']:.2f}%")
+                    with col_p3: 
+                        st.metric("SOC Stock", f"{soil_data['soc_stock']:.1f} t/ha")
+                    
+                    col_tex, col_som = st.columns(2)
+                    with col_tex:
+                        tex_chart = create_soil_texture_chart_html(soil_data, location_name)
+                        display_chart(tex_chart)
+                        
+                        clay = soil_data['clay_content']
+                        silt = soil_data['silt_content']
+                        sand = soil_data['sand_content']
+                        data_summary = f"Clay: {clay}%, Silt: {silt}%, Sand: {sand}%"
+                        show_ai_interpretation("Soil Texture", data_summary, location_name, llm, use_tl)
+                    
+                    with col_som:
+                        som_chart = create_som_gauge_html(soil_data, location_name)
+                        display_chart(som_chart)
+                        
+                        som = soil_data['final_som_estimate']
+                        data_summary = f"Soil Organic Matter: {som:.2f}%"
+                        show_ai_interpretation("Soil Organic Matter", data_summary, location_name, llm, use_tl)
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
 
         else:  # Vegetation & Climate
             if veg_results:
                 with st.container():
                     st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                    st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌿 Vegetation Indices</h3></div>', unsafe_allow_html=True)
+                    st.markdown('<h3 style="margin:0 0 1rem 0;">🌿 Vegetation Indices</h3>', unsafe_allow_html=True)
                     
                     for idx_name, data in veg_results.items():
                         st.markdown(f"**{idx_name}**")
                         veg_chart = create_vegetation_chart_html(data['dates'], data['values'], idx_name, location_name)
-                        if veg_chart:
-                            display_chart(veg_chart)
+                        display_chart(veg_chart)
                         
                         vals = data['values']
-                        col_v1, col_v2, col_v3 = st.columns(3)
-                        with col_v1: 
-                            st.metric(f"{idx_name} Mean", f"{np.mean(vals):.3f}")
-                        with col_v2: 
-                            st.metric(f"{idx_name} Max", f"{np.max(vals):.3f}")
-                        with col_v3: 
-                            st.metric(f"{idx_name} Min", f"{np.min(vals):.3f}")
-                        
+                        mean_v = np.mean(vals)
                         trend = np.polyfit(range(len(vals)), vals, 1)[0]
                         trend_dir = "increasing" if trend > 0.001 else ("decreasing" if trend < -0.001 else "stable")
-                        mean_v = np.mean(vals)
                         
-                        # Health categories
-                        if idx_name == "NDVI":
-                            health = "dense healthy canopy" if mean_v > 0.6 else ("moderate vegetation" if mean_v > 0.4 else ("sparse/stressed" if mean_v > 0.2 else "bare/very sparse"))
-                        elif idx_name == "EVI":
-                            health = "high biomass" if mean_v > 0.5 else ("moderate canopy" if mean_v > 0.3 else "low biomass")
-                        elif idx_name == "NDWI":
-                            health = "well-watered canopy" if mean_v > 0.2 else ("mild water stress" if mean_v > -0.1 else "significant water stress")
-                        elif idx_name == "SAVI":
-                            health = "good ground cover" if mean_v > 0.4 else ("partial cover" if mean_v > 0.2 else "sparse/degraded")
-                        elif idx_name == "GNDVI":
-                            health = "high chlorophyll/N" if mean_v > 0.5 else ("adequate chlorophyll" if mean_v > 0.35 else "chlorophyll/N deficient")
-                        else:
-                            health = "moderate" if mean_v > 0.4 else "low"
-                        
-                        variability = np.std(vals)
-                        seasonality = "strong seasonal pulse" if variability > 0.08 else ("moderate seasonality" if variability > 0.04 else "low variability — evergreen or uniform cover")
-                        
-                        data_summary = (
-                            f"{idx_name} 24-month time series. Mean: {mean_v:.3f} ({health}). "
-                            f"Max: {np.max(vals):.3f}. Min: {np.min(vals):.3f}. "
-                            f"Trend: {trend_dir}. "
-                            f"Variability (std): {variability:.3f} — {seasonality}. "
-                            f"{'2-year decline suggests vegetation degradation or land use change.' if trend < -0.002 else ''}"
-                            f"{'Sustained growth trend — positive land cover change.' if trend > 0.002 else ''}"
-                        )
+                        data_summary = f"{idx_name} mean={mean_v:.3f}, trend={trend_dir}"
                         show_ai_interpretation(f"{idx_name} vegetation index", data_summary, location_name, llm, use_tl)
                         st.markdown("---")
                     
                     st.markdown('</div>', unsafe_allow_html=True)
-
-                if climate_df is not None:
-                    with st.container():
-                        st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                        st.markdown('<h3 style="margin:0 0 0.5rem 0;">🌤️ Climate Data</h3>', unsafe_allow_html=True)
-                        
-                        temp_chart = create_temperature_chart_html(climate_df, location_name)
-                        if temp_chart:
-                            display_chart(temp_chart)
-                        
-                        vt = climate_df['temperature_2m'].tolist()
-                        vm = climate_df['month_name'].tolist()
-                        grow_window = [m for m, t in zip(vm, vt) if t >= 10]
-                        data_summary = (
-                            f"Monthly temperatures range from {min(vt):.1f}°C to {max(vt):.1f}°C. "
-                            f"Thermal growing season: {len(grow_window)} months. "
-                            f"Peak warmth: {max(vt):.1f}°C. "
-                            f"Cold floor: {min(vt):.1f}°C. "
-                            f"Annual range: {max(vt)-min(vt):.1f}°C."
-                        )
-                        show_ai_interpretation("Monthly Temperature for vegetation context", data_summary, location_name, llm, use_tl)
-                        
-                        precip_chart = create_precipitation_chart_html(climate_df, location_name)
-                        if precip_chart:
-                            display_chart(precip_chart)
-                        
-                        vp = climate_df['total_precipitation'].tolist()
-                        green_months = [m for m, p in zip(vm, vp) if p >= 30]
-                        data_summary = (
-                            f"Monthly rainfall ranges from {min(vp):.0f}mm to {max(vp):.0f}mm. "
-                            f"Annual total: {sum(vp):.0f}mm. "
-                            f"Rain-supported growing months (≥30mm): {len(green_months)}. "
-                            f"Peak rainfall: {max(vp):.0f}mm. "
-                            f"Dry season length: {12-len(green_months)} months."
-                        )
-                        show_ai_interpretation("Monthly Precipitation for vegetation context", data_summary, location_name, llm, use_tl)
-                        
-                        st.markdown('</div>', unsafe_allow_html=True)
