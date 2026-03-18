@@ -8,16 +8,16 @@ import os
 import requests
 from pathlib import Path
 
-# Try to import llama_cpp with detailed error handling
+# Try to import ctransformers
 try:
-    from llama_cpp import Llama
-    LLAMA_AVAILABLE = True
-    print("✅ llama-cpp-python imported successfully")
+    from ctransformers import AutoModelForCausalLM
+    CTRANSFORMERS_AVAILABLE = True
+    print("✅ ctransformers imported successfully")
 except ImportError as e:
-    LLAMA_AVAILABLE = False
-    Llama = None
-    print(f"❌ Failed to import llama-cpp-python: {e}")
-    print("💡 To install: pip install llama-cpp-python")
+    CTRANSFORMERS_AVAILABLE = False
+    AutoModelForCausalLM = None
+    print(f"❌ Failed to import ctransformers: {e}")
+    print("💡 To install: pip install ctransformers")
 
 warnings.filterwarnings('ignore')
 
@@ -249,7 +249,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# TINYLLAMA MODEL (with graceful fallback)
+# TINYLLAMA MODEL WITH CTRANSFORMERS
 # =============================================================================
 
 _APP_DIR = Path(__file__).parent.resolve()
@@ -258,60 +258,70 @@ MODEL_PATH = MODEL_DIR / "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
 MODEL_URL = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
 
 
-def download_model_with_progress(progress_bar=None, status_text=None):
-    """Download the model file. Call this OUTSIDE any cached function."""
-    if not LLAMA_AVAILABLE:
-        return False, "llama-cpp-python not installed"
+def download_model():
+    """Download the model from Hugging Face with progress."""
+    if not CTRANSFORMERS_AVAILABLE:
+        return False, "ctransformers not installed"
     
     MODEL_DIR.mkdir(exist_ok=True)
+    
     try:
-        response = requests.get(MODEL_URL, stream=True, timeout=120)
+        response = requests.get(MODEL_URL, stream=True, timeout=30)
         response.raise_for_status()
-    except Exception as e:
-        return False, str(e)
-
+    except requests.exceptions.RequestException as e:
+        return False, f"Failed to download model: {str(e)}"
+    
     total_size = int(response.headers.get('content-length', 0))
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
     downloaded = 0
     try:
         with open(MODEL_PATH, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=65536):
+            for chunk in response.iter_content(chunk_size=8192):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
                     if total_size > 0:
-                        pct = downloaded / total_size
-                        if progress_bar:
-                            progress_bar.progress(min(pct, 1.0))
-                        if status_text:
-                            status_text.text(f"⬇️ Downloading TinyLlama: {downloaded/(1024**2):.0f} / {total_size/(1024**2):.0f} MB")
+                        progress = downloaded / total_size
+                        progress_bar.progress(progress)
+                        status_text.text(f"Downloading: {downloaded / (1024**2):.1f} / {total_size / (1024**2):.1f} MB")
     except Exception as e:
         if MODEL_PATH.exists():
             MODEL_PATH.unlink()
-        return False, str(e)
+        return False, f"Download interrupted: {str(e)}"
+    
+    if total_size > 0 and downloaded != total_size:
+        if MODEL_PATH.exists():
+            MODEL_PATH.unlink()
+        return False, f"Incomplete download: got {downloaded} bytes, expected {total_size}"
+    
+    progress_bar.empty()
+    status_text.empty()
     return True, "OK"
 
 
 @st.cache_resource(show_spinner=False)
 def load_tinyllama_model():
-    """Load TinyLlama from disk. Model file must already exist before calling this."""
-    if not LLAMA_AVAILABLE:
-        return None, "llama-cpp-python not installed. Please add it to requirements.txt"
+    """Load the TinyLLaMA model using ctransformers."""
+    if not CTRANSFORMERS_AVAILABLE:
+        return None, "ctransformers not installed. Please install with: pip install ctransformers"
     
-    abs_path = str(MODEL_PATH.resolve())
     try:
         if not MODEL_PATH.exists():
-            return None, f"Model not found at {abs_path}"
+            return None, f"Model not found at {MODEL_PATH}"
         
-        print(f"🦙 Loading TinyLlama from {abs_path}")
-        llm = Llama(
-            model_path=abs_path,
-            n_ctx=1024,
-            n_threads=2,
-            n_batch=128,
-            verbose=False
+        print(f"🦙 Loading TinyLlama from {MODEL_PATH}")
+        model = AutoModelForCausalLM.from_pretrained(
+            str(MODEL_DIR),
+            model_file=MODEL_PATH.name,
+            model_type="llama",
+            context_length=2048,
+            gpu_layers=0
         )
         print("✅ TinyLlama loaded successfully")
-        return llm, "ok"
+        return model, "ok"
     except Exception as e:
         import traceback
         error_msg = f"{e}\n{traceback.format_exc()[-500:]}"
@@ -319,212 +329,66 @@ def load_tinyllama_model():
         return None, error_msg
 
 
-_GROUNDING = (
-    " Strict rule: only interpret the exact numbers and facts in the data provided. "
-    "Do not invent locations, add data not given, or contradict any value in the dataset."
-)
+def format_prompt(messages, system_prompt=""):
+    """Format conversation history for TinyLLaMA chat format with system prompt."""
+    prompt = ""
+    
+    if system_prompt:
+        prompt += f"<|system|>\n{system_prompt}</s>\n"
+    
+    for msg in messages:
+        if msg["role"] == "user":
+            prompt += f"<|user|>\n{msg['content']}</s>\n"
+        elif msg["role"] == "assistant":
+            prompt += f"<|assistant|>\n{msg['content']}</s>\n"
+    prompt += "<|assistant|>\n"
+    return prompt
 
 
-def _seed(data_summary: str, chars: int = 130) -> str:
-    """Extract a compact data anchor from the summary to pre-seed the response."""
-    s = data_summary[:chars]
-    cut = max(s.rfind(". "), s.rfind(", "))
-    return (s[:cut] if cut > 60 else s).rstrip(" .,")
-
-
-def _build_chart_prompt(chart_type, data_summary, location):
-    """Build chart-specific prompts with data grounding for TinyLlama 1.1B."""
-    ct = chart_type.lower()
-    loc = location or "this region"
-    seed = _seed(data_summary)
-
-    if "climate classification" in ct:
-        return (
-            f"<|system|>\nYou are a senior agroclimate scientist writing a field briefing. "
-            f"Your tone is expert but vivid — paint a picture of what this climate feels like to a farmer on the ground. "
-            f"Highlight the climate zone character, water stress risk, and name 2 high-value crops perfectly suited to these exact conditions."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nWrite a field briefing for {loc}.\nClimate data: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Field Briefing — {loc}**\n"
-            f"The recorded data for {loc} shows: {seed}. "
-        )
-
-    elif "monthly temperature" in ct and "vegetation" not in ct:
-        return (
-            f"<|system|>\nYou are a crop calendar specialist. Analyze the monthly temperature rhythm and identify: "
-            f"(1) the optimal planting window, (2) any heat-stress or frost-risk months to avoid, "
-            f"(3) one specific crop variety recommendation that matches this thermal profile. Be precise about months."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nTemperature profile for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Crop Calendar Analysis — {loc}**\n"
-            f"Temperature data shows: {seed}. "
-        )
-
-    elif "precipitation" in ct and "vegetation" not in ct:
-        return (
-            f"<|system|>\nYou are an irrigation and water-management expert. Focus on: "
-            f"(1) the dry season gap and how many months crops go without meaningful rainfall, "
-            f"(2) whether supplemental irrigation is critical or optional, "
-            f"(3) a rainwater harvesting or scheduling tactic specific to this rainfall pattern."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nRainfall data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Water Management Assessment — {loc}**\n"
-            f"Rainfall data shows: {seed}. "
-        )
-
-    elif "soil moisture" in ct and "distribution" not in ct:
-        return (
-            f"<|system|>\nYou are a precision irrigation engineer. Interpret the soil moisture across depths as a story of root-zone health. "
-            f"Explain what the surface vs. root-zone vs. deep layer values reveal about drainage and water retention. "
-            f"Give one irrigation scheduling recommendation — be specific about timing and depth."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nSoil moisture profile for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Root-Zone Water Status — {loc}**\n"
-            f"Soil moisture readings show: {seed}. "
-        )
-
-    elif "distribution" in ct:
-        return (
-            f"<|system|>\nYou are a soil hydrologist. Compare the three moisture depth layers and explain what their ratio reveals about: "
-            f"(1) topsoil infiltration capacity, (2) subsoil water storage, (3) whether the soil profile favors shallow-rooted or deep-rooted crops. "
-            f"Recommend one drainage improvement if needed."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nMoisture depth comparison for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Soil Profile Hydrology — {loc}**\n"
-            f"Moisture depth data shows: {seed}. "
-        )
-
-    elif "soil texture" in ct or "texture composition" in ct:
-        return (
-            f"<|system|>\nYou are a soil physicist and land use planner. Describe the clay-silt-sand texture triangle position and what it means for: "
-            f"(1) tillage workability, (2) nutrient-holding capacity, (3) compaction risk. "
-            f"Name the one amendment or management practice that would most improve this soil structure."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nSoil texture for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Soil Texture & Workability — {loc}**\n"
-            f"Texture analysis shows: {seed}. "
-        )
-
-    elif "organic matter" in ct or "som" in ct:
-        return (
-            f"<|system|>\nYou are a soil carbon and fertility specialist. Interpret the SOM% and SOC stock value: "
-            f"is this soil carbon-rich, average, or depleted? What does this mean for natural fertility and microbial activity? "
-            f"Give one specific organic matter building practice suited to this level."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nSoil organic matter data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Carbon & Fertility Status — {loc}**\n"
-            f"Soil organic matter data shows: {seed}. "
-        )
-
-    elif "ndvi" in ct:
-        return (
-            f"<|system|>\nYou are a remote sensing agronomist specializing in NDVI time-series. "
-            f"Interpret the 24-month NDVI signal: identify seasonal peaks (crop cycles or natural flush), "
-            f"stress dips (drought, disease, or harvest), and the overall trend direction. "
-            f"Translate the mean NDVI value into a vegetation health category and a concrete management action."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nNDVI time series for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**NDVI Vegetation Health Signal — {loc}**\n"
-            f"NDVI data shows: {seed}. "
-        )
-
-    elif "evi" in ct:
-        return (
-            f"<|system|>\nYou are a canopy structure analyst. EVI captures canopy density and chlorophyll more accurately than NDVI in dense vegetation. "
-            f"Interpret the EVI trend: does it suggest healthy closed-canopy growth or sparse cover? "
-            f"Identify the peak biomass window and recommend one canopy management action."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nEVI canopy data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Canopy Density & Biomass — {loc}**\n"
-            f"EVI data shows: {seed}. "
-        )
-
-    elif "ndwi" in ct:
-        return (
-            f"<|system|>\nYou are a crop water-stress specialist. NDWI reflects water content in the plant canopy. "
-            f"Interpret the 24-month NDWI trend: when was the canopy water-stressed vs. well-watered? "
-            f"Pinpoint the critical stress window and give a targeted irrigation trigger recommendation."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nNDWI water stress data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Canopy Water Stress Timeline — {loc}**\n"
-            f"NDWI data shows: {seed}. "
-        )
-
-    elif "savi" in ct:
-        return (
-            f"<|system|>\nYou are a dryland farming expert. SAVI corrects NDVI for bare soil background — ideal for sparse or semi-arid vegetation. "
-            f"Interpret the SAVI values in the context of soil cover fraction: is vegetation cover adequate for erosion protection? "
-            f"Suggest one ground-cover improvement strategy."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nSAVI ground-cover data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Soil-Adjusted Vegetation Cover — {loc}**\n"
-            f"SAVI data shows: {seed}. "
-        )
-
-    elif "gndvi" in ct:
-        return (
-            f"<|system|>\nYou are a precision nutrition agronomist. GNDVI (green-band NDVI) is sensitive to chlorophyll and nitrogen status. "
-            f"Interpret the GNDVI signal: does it suggest nitrogen sufficiency, deficiency, or luxury uptake? "
-            f"Recommend a fertilization timing or rate adjustment based on the observed trend."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nGNDVI chlorophyll proxy data for {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Chlorophyll & Nitrogen Proxy — {loc}**\n"
-            f"GNDVI data shows: {seed}. "
-        )
-
-    elif "temperature" in ct and "vegetation" in ct:
-        return (
-            f"<|system|>\nYou are a phenology and growing-degree-day specialist. "
-            f"Link the temperature rhythm to vegetation activity: when does warmth trigger green-up, and when does heat or cold suppress growth? "
-            f"Identify the thermal growing season length and the best sowing window."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nTemperature context for vegetation in {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Thermal Growing Season — {loc}**\n"
-            f"Temperature data shows: {seed}. "
-        )
-
-    elif "precipitation" in ct and "vegetation" in ct:
-        return (
-            f"<|system|>\nYou are a rainfall-use-efficiency specialist. Correlate the precipitation pattern with vegetation response: "
-            f"does rainfall drive green pulses? Are there lag effects? "
-            f"Estimate the green season length and give one water-harvesting suggestion to extend productivity."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nPrecipitation context for vegetation in {loc}: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Rainfall-Vegetation Coupling — {loc}**\n"
-            f"Rainfall data shows: {seed}. "
-        )
-
-    else:
-        return (
-            f"<|system|>\nYou are a precision agriculture data scientist. Analyze this geospatial dataset with scientific rigor. "
-            f"Lead with the single most important finding, then give 2 actionable recommendations grounded in the numbers. Avoid generic statements."
-            f"{_GROUNDING}\n</s>\n"
-            f"<|user|>\nChart: {chart_type}\nLocation: {loc}\nData: {data_summary}\n</s>\n"
-            f"<|assistant|>\n**Data Insight — {loc}**\n"
-            f"Data shows: {seed}. "
-        )
+def truncate_messages(messages, max_messages=6):
+    """Keep only the most recent messages to fit within context limit."""
+    if len(messages) > max_messages:
+        return messages[-max_messages:]
+    return messages
 
 
 def tinyllama_interpret(llm, chart_type, data_summary, location):
     """Call TinyLlama to produce a chart-specific, grounded interpretation."""
-    if llm is None or not LLAMA_AVAILABLE:
-        print(f"❌ tinyllama_interpret: llm is {llm}, LLAMA_AVAILABLE is {LLAMA_AVAILABLE}")
+    if llm is None or not CTRANSFORMERS_AVAILABLE:
+        print(f"❌ tinyllama_interpret: llm is {llm}, CTRANSFORMERS_AVAILABLE is {CTRANSFORMERS_AVAILABLE}")
         return None
     
     print(f"✅ tinyllama_interpret: Attempting to generate for {chart_type}")
-    prompt = _build_chart_prompt(chart_type, data_summary, location)
+    
+    # Create a system prompt for Khisba GIS persona
+    system_prompt = """You are Khisba GIS, an enthusiastic remote sensing and GIS expert. Your personality:
+- Name: Khisba GIS
+- Role: Remote sensing and GIS expert
+- Style: Warm, friendly, and approachable
+- Expertise: Deep knowledge of satellite imagery, vegetation indices, and geospatial analysis
+- Always eager to explore new remote sensing challenges
+
+Strict rule: only interpret the exact numbers and facts in the data provided. Do not invent locations, add data not given, or contradict any value in the dataset."""
+
+    # Create messages for the conversation
+    messages = [
+        {"role": "user", "content": f"Analyze this {chart_type} data for {location or 'this region'}:\n{data_summary}"}
+    ]
+    
+    # Format the prompt
+    prompt = format_prompt(messages, system_prompt)
     
     try:
         print(f"🦙 Calling model with prompt length: {len(prompt)}")
-        output = llm(
+        response = llm(
             prompt,
-            max_tokens=320,
+            max_new_tokens=320,
             temperature=0.60,
             top_p=0.90,
-            repeat_penalty=1.08,
-            stop=["</s>", "<|user|>", "<|system|>"]
+            stop=["</s>", "<|user|>", "<|assistant|>", "<|system|>"]
         )
-        text = output["choices"][0]["text"].strip()
+        
+        text = response.strip()
         print(f"✅ Model returned text length: {len(text)}")
         return text if len(text) > 30 else None
     except Exception as e:
@@ -1378,7 +1242,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     print(f"show_ai_interpretation called for {chart_type}")
     print(f"  use_tinyllama: {use_tinyllama}")
     print(f"  llm is None: {llm is None}")
-    print(f"  LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
+    print(f"  CTRANSFORMERS_AVAILABLE: {CTRANSFORMERS_AVAILABLE}")
 
     if "climate classification" in ct:
         label = "🌾 Field Briefing — Agroclimate Assessment"
@@ -1420,7 +1284,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     </div>
     ''', unsafe_allow_html=True)
     
-    if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
+    if use_tinyllama and llm is not None and CTRANSFORMERS_AVAILABLE:
         print("✅ Attempting TinyLlama inference")
         with st.spinner("🦙 TinyLlama is analyzing..."):
             tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
@@ -1429,7 +1293,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
                 f'<span style="font-size:1.2rem;">🦙</span>'
-                f'<span style="color:#00FF88;font-weight:600;font-size:0.85rem;">TinyLlama 1.1B</span>'
+                f'<span style="color:#00FF88;font-weight:600;font-size:0.85rem;">Khisba GIS</span>'
                 f'<span style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);'
                 f'border-radius:20px;padding:1px 8px;font-size:0.7rem;color:#00FF88;">AI</span>'
                 f'</div>',
@@ -1448,7 +1312,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
         print("⚠️ Using rule-based fallback")
         rule_based = get_smart_interpretation(chart_type, data_summary, location)
         ai_source = "GIS Intelligence Engine"
-        if not LLAMA_AVAILABLE:
+        if not CTRANSFORMERS_AVAILABLE:
             ai_source = "GIS Intelligence Engine (TinyLlama not installed)"
         
         st.markdown(
@@ -1484,7 +1348,7 @@ def init_session():
         "tinyllama_enabled": True,
         "tinyllama_loaded": False,
         "tinyllama_download_attempted": False,
-        "llm_instance": None,  # Store llm in session state
+        "llm_instance": None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1566,7 +1430,7 @@ def progress_bar_html(step):
 # Debug sidebar
 with st.sidebar:
     st.markdown("### 🐛 Debug Info")
-    st.write(f"LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
+    st.write(f"CTRANSFORMERS_AVAILABLE: {CTRANSFORMERS_AVAILABLE}")
     st.write(f"Model exists: {MODEL_PATH.exists()}")
     if MODEL_PATH.exists():
         st.write(f"Model size: {MODEL_PATH.stat().st_size / (1024**2):.1f} MB")
@@ -1576,9 +1440,9 @@ with st.sidebar:
     st.write(f"LLM in session state: {st.session_state.llm_instance is not None}")
     
     st.markdown("### 🔍 Model Status")
-    if not LLAMA_AVAILABLE:
-        st.error("❌ llama-cpp-python is NOT installed")
-        st.info("Run: pip install llama-cpp-python")
+    if not CTRANSFORMERS_AVAILABLE:
+        st.error("❌ ctransformers is NOT installed")
+        st.info("Run: pip install ctransformers")
     elif not MODEL_PATH.exists():
         st.warning("⚠️ Model file not downloaded yet")
     elif not st.session_state.tinyllama_loaded:
@@ -1588,12 +1452,12 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 🦙 TinyLlama AI")
-    if LLAMA_AVAILABLE and st.session_state.tinyllama_loaded:
-        st.success("TinyLlama 1.1B ✅", icon="🦙")
+    if CTRANSFORMERS_AVAILABLE and st.session_state.tinyllama_loaded:
+        st.success("Khisba GIS ✅", icon="🦙")
         st.session_state.tinyllama_enabled = st.toggle(
             "Enable AI Analysis", value=st.session_state.tinyllama_enabled
         )
-    elif LLAMA_AVAILABLE and MODEL_PATH.exists():
+    elif CTRANSFORMERS_AVAILABLE and MODEL_PATH.exists():
         st.info("🦙 Model on disk — loading...")
         if st.button("🔄 Manually Load Model"):
             with st.spinner("Loading..."):
@@ -1606,11 +1470,11 @@ with st.sidebar:
                     st.rerun()
                 else:
                     st.error(f"Failed: {_err}")
-    elif LLAMA_AVAILABLE:
+    elif CTRANSFORMERS_AVAILABLE:
         st.info("🦙 Model not downloaded yet.\nScroll up and click the download button.")
     else:
-        st.warning("🦙 TinyLlama not available.\nInstall llama-cpp-python to enable.")
-        st.code("pip install llama-cpp-python")
+        st.warning("🦙 TinyLlama not available.\nInstall ctransformers to enable.")
+        st.code("pip install ctransformers")
     
     st.markdown("---")
     st.markdown("### ⚙️ Settings")
@@ -1633,14 +1497,14 @@ st.markdown("""
 # Initialize llm from session state
 llm = st.session_state.llm_instance
 
-# If model file doesn't exist yet and llama-cpp is available, show download banner
-if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
+# If model file doesn't exist yet and ctransformers is available, show download banner
+if CTRANSFORMERS_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
     st.markdown("""
     <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);
          border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
         <span style="font-size:1.4rem;">🦙</span>
-        <strong style="color:#00FF88;">TinyLlama 1.1B AI — One-time Download Required</strong>
+        <strong style="color:#00FF88;">Khisba GIS AI — One-time Download Required</strong>
       </div>
       <p style="color:#CCCCCC;margin:0;font-size:0.9rem;">
         The TinyLlama model (~637 MB) needs to be downloaded once to enable real AI chart interpretation.
@@ -1650,11 +1514,7 @@ if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllam
     """, unsafe_allow_html=True)
     if st.button("⬇️ Download TinyLlama & Enable AI Analysis", use_container_width=True, type="primary"):
         st.session_state.tinyllama_download_attempted = True
-        pb = st.progress(0)
-        st_txt = st.empty()
-        ok, err = download_model_with_progress(pb, st_txt)
-        pb.empty()
-        st_txt.empty()
+        ok, err = download_model()
         if ok:
             _llm, _err2 = load_tinyllama_model()
             if _llm:
@@ -1669,7 +1529,7 @@ if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllam
         else:
             st.error(f"Download failed: {err}")
 
-elif LLAMA_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_loaded:
+elif CTRANSFORMERS_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_loaded:
     # Model already on disk — load it (cached, fast after first time)
     with st.spinner("🦙 Loading TinyLlama model..."):
         _llm, _err = load_tinyllama_model()
@@ -1678,12 +1538,12 @@ elif LLAMA_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_
             st.session_state.tinyllama_enabled = True
             st.session_state.llm_instance = _llm
             llm = _llm
-            st.success("🦙 TinyLlama loaded successfully!")
+            st.success("🦙 Khisba GIS loaded successfully!")
         else:
             st.warning(f"🦙 TinyLlama model found but failed to load: {_err}")
 
 # Always try to get the cached model if loaded
-if st.session_state.tinyllama_loaded and LLAMA_AVAILABLE and st.session_state.llm_instance is None:
+if st.session_state.tinyllama_loaded and CTRANSFORMERS_AVAILABLE and st.session_state.llm_instance is None:
     _llm, _ = load_tinyllama_model()
     if _llm:
         st.session_state.llm_instance = _llm
@@ -1815,8 +1675,8 @@ with col1:
         else:
             st.sidebar.info("ℹ️ TinyLlama is disabled")
 
-        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and st.session_state.llm_instance is not None and LLAMA_AVAILABLE) else "🤖 GIS Intelligence"
-        ai_note = " (TinyLlama not installed)" if not LLAMA_AVAILABLE else ""
+        ai_status = "🦙 Khisba GIS" if (st.session_state.tinyllama_enabled and st.session_state.llm_instance is not None and CTRANSFORMERS_AVAILABLE) else "🤖 GIS Intelligence"
+        ai_note = " (TinyLlama not installed)" if not CTRANSFORMERS_AVAILABLE else ""
         st.markdown(f"""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
             <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">{ai_status}{ai_note}: ✅ Ready<br>
             📈 <strong>Charts with AI interpretation</strong> are shown on the right.</p></div>""", unsafe_allow_html=True)
@@ -1856,7 +1716,7 @@ with col2:
         
         # Get llm from session state
         llm = st.session_state.llm_instance
-        use_tl = st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE
+        use_tl = st.session_state.tinyllama_enabled and llm is not None and CTRANSFORMERS_AVAILABLE
 
         if st.session_state.analysis_type == "Climate & Soil":
             # Climate Classification
