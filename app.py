@@ -222,7 +222,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# TINYLLAMA MODEL
+# TINYLLAMA MODEL (with graceful fallback)
 # =============================================================================
 
 _APP_DIR = Path(__file__).parent.resolve()
@@ -233,6 +233,9 @@ MODEL_URL = "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resol
 
 def download_model_with_progress(progress_bar=None, status_text=None):
     """Download the model file. Call this OUTSIDE any cached function."""
+    if not LLAMA_AVAILABLE:
+        return False, "llama-cpp-python not installed"
+    
     MODEL_DIR.mkdir(exist_ok=True)
     try:
         response = requests.get(MODEL_URL, stream=True, timeout=120)
@@ -264,9 +267,11 @@ def download_model_with_progress(progress_bar=None, status_text=None):
 @st.cache_resource(show_spinner=False)
 def load_tinyllama_model():
     """Load TinyLlama from disk. Model file must already exist before calling this."""
+    if not LLAMA_AVAILABLE:
+        return None, "llama-cpp-python not installed. Please add it to requirements.txt"
+    
     abs_path = str(MODEL_PATH.resolve())
     try:
-        from llama_cpp import Llama
         if not MODEL_PATH.exists():
             return None, f"Model not found at {abs_path}"
         llm = Llama(
@@ -280,11 +285,6 @@ def load_tinyllama_model():
     except Exception as e:
         import traceback
         return None, f"{e}\n{traceback.format_exc()[-500:]}"
-
-
-def load_tinyllama():
-    """Legacy wrapper kept for compatibility."""
-    return load_tinyllama_model()
 
 
 _GROUNDING = (
@@ -475,7 +475,7 @@ def _build_chart_prompt(chart_type, data_summary, location):
 
 def tinyllama_interpret(llm, chart_type, data_summary, location):
     """Call TinyLlama to produce a chart-specific, grounded interpretation."""
-    if llm is None:
+    if llm is None or not LLAMA_AVAILABLE:
         return None
     prompt = _build_chart_prompt(chart_type, data_summary, location)
     try:
@@ -1245,38 +1245,38 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
 
     # Pick expander label based on chart type
     if "climate classification" in ct:
-        label = "🦙 Field Briefing — Agroclimate Assessment"
+        label = "🌾 Field Briefing — Agroclimate Assessment"
     elif "monthly temperature" in ct and "vegetation" not in ct:
-        label = "🦙 Crop Calendar Analysis"
+        label = "🌾 Crop Calendar Analysis"
     elif "precipitation" in ct and "vegetation" not in ct:
-        label = "🦙 Water Management Assessment"
+        label = "🌾 Water Management Assessment"
     elif "soil moisture" in ct and "distribution" not in ct:
-        label = "🦙 Root-Zone Water Status"
+        label = "🌾 Root-Zone Water Status"
     elif "distribution" in ct:
-        label = "🦙 Soil Profile Hydrology"
+        label = "🌾 Soil Profile Hydrology"
     elif "soil texture" in ct or "texture composition" in ct:
-        label = "🦙 Soil Texture & Workability"
+        label = "🌾 Soil Texture & Workability"
     elif "organic matter" in ct or "som" in ct:
-        label = "🦙 Carbon & Fertility Status"
+        label = "🌾 Carbon & Fertility Status"
     elif "ndvi" in ct:
-        label = "🦙 NDVI Vegetation Health Signal"
+        label = "🌾 NDVI Vegetation Health Signal"
     elif "evi" in ct:
-        label = "🦙 Canopy Density & Biomass"
+        label = "🌾 Canopy Density & Biomass"
     elif "ndwi" in ct:
-        label = "🦙 Canopy Water Stress Timeline"
+        label = "🌾 Canopy Water Stress Timeline"
     elif "savi" in ct:
-        label = "🦙 Soil-Adjusted Vegetation Cover"
+        label = "🌾 Soil-Adjusted Vegetation Cover"
     elif "gndvi" in ct:
-        label = "🦙 Chlorophyll & Nitrogen Proxy"
+        label = "🌾 Chlorophyll & Nitrogen Proxy"
     elif "temperature" in ct and "vegetation" in ct:
-        label = "🦙 Thermal Growing Season"
+        label = "🌾 Thermal Growing Season"
     elif "precipitation" in ct and "vegetation" in ct:
-        label = "🦙 Rainfall–Vegetation Coupling"
+        label = "🌾 Rainfall–Vegetation Coupling"
     else:
-        label = "🦙 AI Data Insight"
+        label = "🌾 AI Data Insight"
 
     with st.expander(label, expanded=True):
-        if use_tinyllama and llm is not None:
+        if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
             with st.spinner("TinyLlama is thinking..."):
                 tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
             if tl_result:
@@ -1299,11 +1299,15 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
                 st.markdown(rule_based)
         else:
             rule_based = get_smart_interpretation(chart_type, data_summary, location)
+            ai_source = "GIS Intelligence Engine"
+            if not LLAMA_AVAILABLE:
+                ai_source = "GIS Intelligence Engine (TinyLlama not installed)"
+            
             st.markdown(
-                '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
-                '<span style="font-size:1.1rem;">🤖</span>'
-                '<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">GIS Intelligence Engine</span>'
-                '</div>',
+                f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
+                f'<span style="font-size:1.1rem;">🤖</span>'
+                f'<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">{ai_source}</span>'
+                f'</div>',
                 unsafe_allow_html=True
             )
             st.markdown(rule_based)
@@ -1412,18 +1416,23 @@ def progress_bar_html(step):
 st.markdown("""
 <div style="padding: 0.5rem 0 1rem 0;">
   <h1>🌍 Khisba GIS</h1>
-  <p style="color:#CCCCCC; margin:0; font-size:0.9rem;">Climate & Soil Analyzer · GIS Intelligence AI + TinyLlama</p>
+  <p style="color:#CCCCCC; margin:0; font-size:0.9rem;">Climate & Soil Analyzer · GIS Intelligence AI</p>
 </div>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# AUTO-LOAD TINYLLAMA ON STARTUP
+# AUTO-LOAD TINYLLAMA ON STARTUP (with graceful fallback)
 # =============================================================================
 
 llm = None
 
-# If model file doesn't exist yet, show a one-time download banner
-if not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
+# Check if llama-cpp is available
+if not LLAMA_AVAILABLE:
+    st.sidebar.info("🦙 TinyLlama AI: Disabled (package not installed) - using rule-based analysis")
+    st.session_state.tinyllama_enabled = False
+
+# If model file doesn't exist yet and llama-cpp is available, show download banner
+elif not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
     st.markdown("""
     <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);
          border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
@@ -1457,7 +1466,7 @@ if not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted
         else:
             st.error(f"Download failed: {err}")
 
-elif MODEL_PATH.exists() and not st.session_state.tinyllama_loaded:
+elif MODEL_PATH.exists() and not st.session_state.tinyllama_loaded and LLAMA_AVAILABLE:
     # Model already on disk — load it (cached, fast after first time)
     _llm, _err = load_tinyllama_model()
     if _llm:
@@ -1467,7 +1476,7 @@ elif MODEL_PATH.exists() and not st.session_state.tinyllama_loaded:
     else:
         st.warning(f"🦙 TinyLlama model found but failed to load: {_err}")
 
-elif st.session_state.tinyllama_loaded:
+elif st.session_state.tinyllama_loaded and LLAMA_AVAILABLE:
     # Already loaded in a previous rerun — retrieve from cache
     _llm, _ = load_tinyllama_model()
     llm = _llm
@@ -1475,15 +1484,17 @@ elif st.session_state.tinyllama_loaded:
 # Sidebar — status + settings
 with st.sidebar:
     st.markdown("### 🦙 TinyLlama AI")
-    if st.session_state.tinyllama_loaded and llm is not None:
+    if LLAMA_AVAILABLE and st.session_state.tinyllama_loaded and llm is not None:
         st.success("TinyLlama 1.1B ✅", icon="🦙")
         st.session_state.tinyllama_enabled = st.toggle(
             "Enable AI Analysis", value=st.session_state.tinyllama_enabled
         )
-    elif MODEL_PATH.exists():
+    elif LLAMA_AVAILABLE and MODEL_PATH.exists():
         st.info("🦙 Model on disk — loading...")
-    else:
+    elif LLAMA_AVAILABLE:
         st.info("🦙 Model not downloaded yet.\nScroll up and click the download button.")
+    else:
+        st.warning("🦙 TinyLlama not available.\nInstall llama-cpp-python to enable.")
     
     st.markdown("---")
     st.markdown("### ⚙️ Settings")
@@ -1607,9 +1618,10 @@ with col1:
         st.markdown('<div class="card-header"><div class="card-icon">📊</div><h3 style="margin:0;">Results</h3></div>', unsafe_allow_html=True)
         st.success(f"✅ Analysis complete for **{location_name}**")
 
-        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and llm is not None) else "🤖 GIS Intelligence"
+        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE) else "🤖 GIS Intelligence"
+        ai_note = " (TinyLlama not installed)" if not LLAMA_AVAILABLE else ""
         st.markdown(f"""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
-            <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">{ai_status}: ✅ Ready<br>
+            <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">{ai_status}{ai_note}: ✅ Ready<br>
             📈 <strong>Charts with AI interpretation</strong> are shown on the right.</p></div>""", unsafe_allow_html=True)
 
         cb, cn = st.columns(2)
@@ -1644,7 +1656,7 @@ with col2:
         soil_data = st.session_state.get("soil_data")
         climate_cls = st.session_state.get("climate_classification")
         veg_results = st.session_state.get("vegetation_results")
-        use_tl = st.session_state.tinyllama_enabled and llm is not None
+        use_tl = st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE
 
         if st.session_state.analysis_type == "Climate & Soil":
             # Climate Classification
