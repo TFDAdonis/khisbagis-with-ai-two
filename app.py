@@ -139,15 +139,6 @@ st.markdown("""
     [data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
     }
-    [style*="background: #FF6B6B"],
-    [style*="background: #4A90E2"],
-    [style*="background: #00FF88"],
-    [style*="background: #FFAA44"],
-    [style*="background: #8B4513"],
-    [style*="background: #DEB887"],
-    [style*="background: #F4A460"] {
-        transition: all 0.2s ease;
-    }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
@@ -919,12 +910,12 @@ def create_temperature_chart_html(df, location_name):
     temp_range = max_temp - min_temp if max_temp > min_temp else 1
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">Monthly Temperature</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Monthly Temperature</h4>
             {accuracy_badge_html("high", "±1-2°C ERA5-Land")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 4px; margin: 20px 0; padding: 0 10px;">
+        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
     '''
     
     for i, (month, temp) in enumerate(zip(months, temps)):
@@ -932,10 +923,11 @@ def create_temperature_chart_html(df, location_name):
         height_percent = ((temp - min_temp) / temp_range) * 180 + 30 if temp_range > 0 else 100
         chart_html += f'''
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
-                <div style="width: 80%; background: #FF6B6B; height: {height_percent}px; 
-                           border-radius: 6px 6px 0 0; opacity: 0.9; transition: all 0.2s ease;
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
-                           border: 1px solid rgba(255,255,255,0.1);" 
+                <div style="width: 70%; background: #FF6B6B; height: {height_percent}px; 
+                           border-radius: 8px 8px 0 0; opacity: 0.9; 
+                           box-shadow: 0 4px 12px rgba(255,107,107,0.3); 
+                           border: 1px solid rgba(255,255,255,0.1);
+                           transition: all 0.2s ease;" 
                      title="{month}: {temp}°C"></div>
                 <div style="color: #FFFFFF; font-size: 0.9rem; margin-top: 10px; font-weight: 600;">{temp}°C</div>
                 <div style="color: #CCCCCC; font-size: 0.8rem; margin-top: 2px; font-weight: 500;">{month}</div>
@@ -944,7 +936,7 @@ def create_temperature_chart_html(df, location_name):
     
     chart_html += '''
         </div>
-        <div class="mini-legend" style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
             <span style="display: flex; align-items: center; gap: 0.3rem;">
                 <span style="width: 16px; height: 16px; background: #FF6B6B; border-radius: 4px; display: inline-block;"></span>
                 <span style="color: #CCCCCC; font-size: 0.9rem;">Mean Temperature (°C)</span>
@@ -964,22 +956,23 @@ def create_precipitation_chart_html(df, location_name):
     max_precip = max(precip) if max(precip) > 0 else 100
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">Monthly Precipitation</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Monthly Precipitation</h4>
             {accuracy_badge_html("medium", "±20-40% CHIRPS")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 4px; margin: 20px 0; padding: 0 10px;">
+        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
     '''
     
     for i, (month, p) in enumerate(zip(months, precip)):
         height_percent = (p / max_precip) * 200 if max_precip > 0 else 100
         chart_html += f'''
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
-                <div style="width: 80%; background: #4A90E2; height: {height_percent}px; 
-                           border-radius: 6px 6px 0 0; opacity: 0.9; transition: all 0.2s ease;
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);" 
+                <div style="width: 70%; background: #4A90E2; height: {height_percent}px; 
+                           border-radius: 8px 8px 0 0; opacity: 0.9; 
+                           box-shadow: 0 4px 12px rgba(74,144,226,0.3);
+                           border: 1px solid rgba(255,255,255,0.1);
+                           transition: all 0.2s ease;" 
                      title="{month}: {p:.1f}mm"></div>
                 <div style="color: #FFFFFF; font-size: 0.9rem; margin-top: 10px; font-weight: 600;">{p:.0f}mm</div>
                 <div style="color: #CCCCCC; font-size: 0.8rem; margin-top: 2px; font-weight: 500;">{month}</div>
@@ -988,7 +981,7 @@ def create_precipitation_chart_html(df, location_name):
     
     chart_html += '''
         </div>
-        <div class="mini-legend" style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
             <span style="display: flex; align-items: center; gap: 0.3rem;">
                 <span style="width: 16px; height: 16px; background: #4A90E2; border-radius: 4px; display: inline-block;"></span>
                 <span style="color: #CCCCCC; font-size: 0.9rem;">Precipitation (mm)</span>
@@ -1010,12 +1003,12 @@ def create_soil_moisture_chart_html(df, location_name):
     max_value = max(max(surface), max(root), max(deep)) * 1.2
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">Soil Moisture by Layer</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Moisture by Layer</h4>
             {accuracy_badge_html("medium", "±0.05 m³/m³")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 4px; margin: 20px 0; padding: 0 10px;">
+        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 8px; margin: 20px 0; padding: 0 5px;">
     '''
     
     for i, month in enumerate(months):
@@ -1027,19 +1020,22 @@ def create_soil_moisture_chart_html(df, location_name):
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
                 <div style="width: 100%; display: flex; flex-direction: column-reverse; gap: 2px; height: 200px;">
                     <div style="width: 100%; background: #FFAA44; height: {deep_height}px; 
-                               border-radius: 4px 4px 0 0; transition: all 0.2s ease;
-                               box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);" 
+                               border-radius: 6px 6px 0 0; 
+                               box-shadow: 0 2px 8px rgba(255,170,68,0.3);
+                               border: 1px solid rgba(255,255,255,0.1);
+                               transition: all 0.2s ease;" 
                          title="Deep: {deep[i]:.3f} m³/m³"></div>
                     <div style="width: 100%; background: #4A90E2; height: {root_height}px; 
-                               border-radius: 4px 4px 0 0; transition: all 0.2s ease;
-                               box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);" 
+                               border-radius: 6px 6px 0 0;
+                               box-shadow: 0 2px 8px rgba(74,144,226,0.3);
+                               border: 1px solid rgba(255,255,255,0.1);
+                               transition: all 0.2s ease;" 
                          title="Root: {root[i]:.3f} m³/m³"></div>
                     <div style="width: 100%; background: #00FF88; height: {surface_height}px; 
-                               border-radius: 4px 4px 0 0; transition: all 0.2s ease;
-                               box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                               border: 1px solid rgba(255,255,255,0.1);" 
+                               border-radius: 6px 6px 0 0;
+                               box-shadow: 0 2px 8px rgba(0,255,136,0.3);
+                               border: 1px solid rgba(255,255,255,0.1);
+                               transition: all 0.2s ease;" 
                          title="Surface: {surface[i]:.3f} m³/m³"></div>
                 </div>
                 <div style="color: #FFFFFF; font-size: 0.8rem; margin-top: 10px; font-weight: 500;">{month}</div>
@@ -1048,7 +1044,7 @@ def create_soil_moisture_chart_html(df, location_name):
     
     chart_html += '''
         </div>
-        <div class="mini-legend" style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A; flex-wrap: wrap;">
+        <div style="display: flex; gap: 1.5rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A; flex-wrap: wrap;">
             <span style="display: flex; align-items: center; gap: 0.3rem;">
                 <span style="width: 16px; height: 16px; background: #00FF88; border-radius: 4px; display: inline-block;"></span>
                 <span style="color: #CCCCCC; font-size: 0.9rem;">Surface (0-7cm)</span>
@@ -1077,8 +1073,8 @@ def create_soil_distribution_chart_html(df):
     max_val = max(surface_mean, root_mean, deep_mean)
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
-        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF;">Average Soil Moisture Distribution</h4>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF; font-size: 1.1rem;">Average Soil Moisture Distribution</h4>
         <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: center; gap: 3rem; height: 250px; margin: 20px 0;">
     '''
     
@@ -1091,9 +1087,10 @@ def create_soil_distribution_chart_html(df):
         chart_html += f'''
             <div style="display: flex; flex-direction: column; align-items: center; width: 120px;">
                 <div style="width: 80px; background: {color}; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; margin-bottom: 15px; transition: all 0.2s ease;
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);" 
+                           border-radius: 8px 8px 0 0; margin-bottom: 15px; 
+                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                           border: 1px solid rgba(255,255,255,0.1);
+                           transition: all 0.2s ease;" 
                      title="{value:.3f} m³/m³"></div>
                 <div style="color: #FFFFFF; font-weight: 700; font-size: 1.2rem; margin-bottom: 5px;">{value:.3f}</div>
                 <div style="color: #CCCCCC; font-size: 0.9rem; text-align: center;">{label}</div>
@@ -1102,7 +1099,7 @@ def create_soil_distribution_chart_html(df):
     
     chart_html += '''
         </div>
-        <div class="mini-legend" style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
+        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
             <span style="color: #CCCCCC; font-size: 0.9rem;">Units: m³/m³</span>
         </div>
     </div>
@@ -1126,12 +1123,12 @@ def create_vegetation_chart_html(dates, values, index_name, location_name):
     display_values = values[:12]
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">{index_name} Time Series (12 months)</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">{index_name} Time Series (12 months)</h4>
             {accuracy_badge_html("high", "±0.05 Sentinel-2")}
         </div>
-        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 2px; margin: 20px 0; padding: 0 5px;">
+        <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: space-around; height: 250px; gap: 4px; margin: 20px 0; padding: 0 5px;">
     '''
     
     for date, val in zip(display_dates, display_values):
@@ -1139,10 +1136,11 @@ def create_vegetation_chart_html(dates, values, index_name, location_name):
         short_date = date[-2:]  # Show only last 2 digits of month
         chart_html += f'''
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
-                <div style="width: 80%; background: {color}; height: {height_percent}px; 
-                           border-radius: 6px 6px 0 0; opacity: 0.9; transition: all 0.2s ease;
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);" 
+                <div style="width: 70%; background: {color}; height: {height_percent}px; 
+                           border-radius: 8px 8px 0 0; opacity: 0.9; 
+                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                           border: 1px solid rgba(255,255,255,0.1);
+                           transition: all 0.2s ease;" 
                      title="{date}: {val:.3f}"></div>
                 <div style="color: #FFFFFF; font-size: 0.8rem; margin-top: 8px; font-weight: 600;">{val:.3f}</div>
                 <div style="color: #CCCCCC; font-size: 0.7rem; margin-top: 2px;">{short_date}</div>
@@ -1151,7 +1149,7 @@ def create_vegetation_chart_html(dates, values, index_name, location_name):
     
     chart_html += f'''
         </div>
-        <div class="mini-legend" style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
+        <div style="display: flex; gap: 1rem; margin-top: 1rem; padding-top: 0.5rem; border-top: 1px solid #2A2A2A;">
             <span style="display: flex; align-items: center; gap: 0.3rem;">
                 <span style="width: 16px; height: 16px; background: {color}; border-radius: 4px; display: inline-block;"></span>
                 <span style="color: #CCCCCC; font-size: 0.9rem;">{index_name}</span>
@@ -1170,9 +1168,9 @@ def create_soil_texture_chart_html(soil_data, location_name):
     sand = soil_data['sand_content']
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">Soil Texture Composition</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Texture Composition</h4>
             {accuracy_badge_html("medium", "±25% ISDASoil")}
         </div>
         <div style="display: flex; flex-direction: row; align-items: flex-end; justify-content: center; gap: 3rem; height: 250px; margin: 20px 0;">
@@ -1189,9 +1187,10 @@ def create_soil_texture_chart_html(soil_data, location_name):
         chart_html += f'''
             <div style="display: flex; flex-direction: column; align-items: center; width: 120px;">
                 <div style="width: 80px; background: {comp['color']}; height: {height_percent}px; 
-                           border-radius: 8px 8px 0 0; margin-bottom: 15px; transition: all 0.2s ease;
-                           box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                           border: 1px solid rgba(255,255,255,0.1);" 
+                           border-radius: 8px 8px 0 0; margin-bottom: 15px; 
+                           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                           border: 1px solid rgba(255,255,255,0.1);
+                           transition: all 0.2s ease;" 
                      title="{comp['name']}: {comp['value']}%"></div>
                 <div style="color: #FFFFFF; font-weight: 700; font-size: 1.4rem; margin-bottom: 5px;">{comp['value']}%</div>
                 <div style="color: #CCCCCC; font-size: 1rem;">{comp['name']}</div>
@@ -1224,9 +1223,9 @@ def create_som_gauge_html(soil_data, location_name):
     percentage = (som_value / 6) * 100  # Max 6%
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; margin: 1rem 0; width: 100%;">
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-            <h4 style="margin: 0; color: #FFFFFF;">Soil Organic Matter</h4>
+            <h4 style="margin: 0; color: #FFFFFF; font-size: 1.1rem;">Soil Organic Matter</h4>
             {accuracy_badge_html("medium", "±20% GSOC")}
         </div>
         <div style="text-align: center;">
@@ -1278,8 +1277,8 @@ def create_climate_temp_gauge_html(climate_data):
     percentage = ((temp + 20) / 65) * 100  # Range -20 to 45
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem;">
-        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF;">Mean Annual Temperature</h4>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF; font-size: 1.1rem;">Mean Annual Temperature</h4>
         <div style="text-align: center;">
             <div style="position: relative; width: 200px; height: 100px; margin: 0 auto; overflow: hidden;">
                 <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; 
@@ -1323,8 +1322,8 @@ def create_climate_precip_gauge_html(climate_data):
     percentage = (precip / 3000) * 100  # Max 3000mm
     
     chart_html = f'''
-    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem;">
-        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF;">Annual Precipitation</h4>
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <h4 style="margin: 0 0 1.5rem 0; color: #FFFFFF; font-size: 1.1rem;">Annual Precipitation</h4>
         <div style="text-align: center;">
             <div style="position: relative; width: 200px; height: 100px; margin: 0 auto; overflow: hidden;">
                 <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; 
@@ -1342,6 +1341,18 @@ def create_climate_precip_gauge_html(climate_data):
     '''
     
     return chart_html
+
+
+# =============================================================================
+# HELPER FUNCTION FOR CHART DISPLAY
+# =============================================================================
+
+def display_chart(chart_html):
+    """Helper function to properly display HTML charts using components"""
+    if chart_html and len(chart_html) > 100:
+        st.components.v1.html(chart_html, height=400, scrolling=False)
+    else:
+        st.error("Chart failed to render")
 
 
 # =============================================================================
@@ -1803,11 +1814,11 @@ with col2:
                     with col_g1:
                         temp_gauge = create_climate_temp_gauge_html(climate_cls)
                         if temp_gauge:
-                            st.markdown(temp_gauge, unsafe_allow_html=True)
+                            display_chart(temp_gauge)
                     with col_g2:
                         precip_gauge = create_climate_precip_gauge_html(climate_cls)
                         if precip_gauge:
-                            st.markdown(precip_gauge, unsafe_allow_html=True)
+                            display_chart(precip_gauge)
                     
                     arid = climate_cls.get('aridity_index', 0)
                     water_stress = "severe drought stress" if arid < 0.5 else ("moderate water stress" if arid < 1.0 else ("balanced water regime" if arid < 2.0 else "humid surplus"))
@@ -1830,8 +1841,7 @@ with col2:
                     with tab1:
                         # Temperature chart
                         temp_chart = create_temperature_chart_html(climate_df, location_name)
-                        if temp_chart:
-                            st.markdown(temp_chart, unsafe_allow_html=True)
+                        display_chart(temp_chart)
                         
                         # Metrics
                         col_t1, col_t2, col_t3, col_t4 = st.columns(4)
@@ -1868,8 +1878,7 @@ with col2:
                     with tab2:
                         # Precipitation chart
                         precip_chart = create_precipitation_chart_html(climate_df, location_name)
-                        if precip_chart:
-                            st.markdown(precip_chart, unsafe_allow_html=True)
+                        display_chart(precip_chart)
                         
                         # Metrics
                         col_p1, col_p2, col_p3 = st.columns(3)
@@ -1899,8 +1908,7 @@ with col2:
                     with tab3:
                         # Soil moisture chart
                         soil_chart = create_soil_moisture_chart_html(climate_df, location_name)
-                        if soil_chart:
-                            st.markdown(soil_chart, unsafe_allow_html=True)
+                        display_chart(soil_chart)
                         
                         # Metrics
                         col_s1, col_s2, col_s3 = st.columns(3)
@@ -1921,8 +1929,7 @@ with col2:
                     with tab4:
                         # Distribution chart
                         dist_chart = create_soil_distribution_chart_html(climate_df)
-                        if dist_chart:
-                            st.markdown(dist_chart, unsafe_allow_html=True)
+                        display_chart(dist_chart)
                         
                         st.markdown("""
                         <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;margin-top:1rem;">
@@ -1975,7 +1982,7 @@ with col2:
                     with col_tex:
                         tex_chart = create_soil_texture_chart_html(soil_data, location_name)
                         if tex_chart:
-                            st.markdown(tex_chart, unsafe_allow_html=True)
+                            display_chart(tex_chart)
                         
                         clay = soil_data['clay_content']
                         silt = soil_data['silt_content']
@@ -1995,7 +2002,7 @@ with col2:
                     with col_som:
                         som_chart = create_som_gauge_html(soil_data, location_name)
                         if som_chart:
-                            st.markdown(som_chart, unsafe_allow_html=True)
+                            display_chart(som_chart)
                         
                         som = soil_data['final_som_estimate']
                         soc = soil_data['soc_stock']
@@ -2021,7 +2028,7 @@ with col2:
                         st.markdown(f"**{idx_name}**")
                         veg_chart = create_vegetation_chart_html(data['dates'], data['values'], idx_name, location_name)
                         if veg_chart:
-                            st.markdown(veg_chart, unsafe_allow_html=True)
+                            display_chart(veg_chart)
                         
                         vals = data['values']
                         col_v1, col_v2, col_v3 = st.columns(3)
@@ -2073,7 +2080,7 @@ with col2:
                         
                         temp_chart = create_temperature_chart_html(climate_df, location_name)
                         if temp_chart:
-                            st.markdown(temp_chart, unsafe_allow_html=True)
+                            display_chart(temp_chart)
                         
                         vt = climate_df['temperature_2m'].tolist()
                         vm = climate_df['month_name'].tolist()
@@ -2089,7 +2096,7 @@ with col2:
                         
                         precip_chart = create_precipitation_chart_html(climate_df, location_name)
                         if precip_chart:
-                            st.markdown(precip_chart, unsafe_allow_html=True)
+                            display_chart(precip_chart)
                         
                         vp = climate_df['total_precipitation'].tolist()
                         green_months = [m for m, p in zip(vm, vp) if p >= 30]
