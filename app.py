@@ -8,13 +8,16 @@ import os
 import requests
 from pathlib import Path
 
-# Try to import llama_cpp, but don't fail if it's not available
+# Try to import llama_cpp with detailed error handling
 try:
     from llama_cpp import Llama
     LLAMA_AVAILABLE = True
-except ImportError:
+    print("✅ llama-cpp-python imported successfully")
+except ImportError as e:
     LLAMA_AVAILABLE = False
     Llama = None
+    print(f"❌ Failed to import llama-cpp-python: {e}")
+    print("💡 To install: pip install llama-cpp-python")
 
 warnings.filterwarnings('ignore')
 
@@ -298,6 +301,8 @@ def load_tinyllama_model():
     try:
         if not MODEL_PATH.exists():
             return None, f"Model not found at {abs_path}"
+        
+        print(f"🦙 Loading TinyLlama from {abs_path}")
         llm = Llama(
             model_path=abs_path,
             n_ctx=1024,
@@ -305,10 +310,13 @@ def load_tinyllama_model():
             n_batch=128,
             verbose=False
         )
+        print("✅ TinyLlama loaded successfully")
         return llm, "ok"
     except Exception as e:
         import traceback
-        return None, f"{e}\n{traceback.format_exc()[-500:]}"
+        error_msg = f"{e}\n{traceback.format_exc()[-500:]}"
+        print(f"❌ Failed to load TinyLlama: {error_msg}")
+        return None, error_msg
 
 
 _GROUNDING = (
@@ -500,9 +508,14 @@ def _build_chart_prompt(chart_type, data_summary, location):
 def tinyllama_interpret(llm, chart_type, data_summary, location):
     """Call TinyLlama to produce a chart-specific, grounded interpretation."""
     if llm is None or not LLAMA_AVAILABLE:
+        print(f"❌ tinyllama_interpret: llm is {llm}, LLAMA_AVAILABLE is {LLAMA_AVAILABLE}")
         return None
+    
+    print(f"✅ tinyllama_interpret: Attempting to generate for {chart_type}")
     prompt = _build_chart_prompt(chart_type, data_summary, location)
+    
     try:
+        print(f"🦙 Calling model with prompt length: {len(prompt)}")
         output = llm(
             prompt,
             max_tokens=320,
@@ -512,8 +525,12 @@ def tinyllama_interpret(llm, chart_type, data_summary, location):
             stop=["</s>", "<|user|>", "<|system|>"]
         )
         text = output["choices"][0]["text"].strip()
+        print(f"✅ Model returned text length: {len(text)}")
         return text if len(text) > 30 else None
-    except Exception:
+    except Exception as e:
+        print(f"❌ Model inference failed: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -919,7 +936,6 @@ def create_temperature_chart_html(df, location_name):
     '''
     
     for i, (month, temp) in enumerate(zip(months, temps)):
-        # Calculate height percentage (minimum 30px for visibility)
         height_percent = ((temp - min_temp) / temp_range) * 180 + 30 if temp_range > 0 else 100
         chart_html += f'''
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 40px;">
@@ -1118,7 +1134,6 @@ def create_vegetation_chart_html(dates, values, index_name, location_name):
                  'GNDVI': '#00CC6A', 'NBR': '#FF4444', 'SI': '#8B4513', 'NDSI_Salinity': '#DEB887', 'AWEI': '#87CEEB'}
     color = color_map.get(index_name, '#00FF88')
     
-    # Show only first 12 months for readability
     display_dates = dates[:12]
     display_values = values[:12]
     
@@ -1133,7 +1148,7 @@ def create_vegetation_chart_html(dates, values, index_name, location_name):
     
     for date, val in zip(display_dates, display_values):
         height_percent = ((val - min_val) / val_range) * 200 + 30 if val_range > 0 else 100
-        short_date = date[-2:]  # Show only last 2 digits of month
+        short_date = date[-2:]
         chart_html += f'''
             <div style="flex: 1; display: flex; flex-direction: column; align-items: center; min-width: 30px;">
                 <div style="width: 70%; background: {color}; height: {height_percent}px; 
@@ -1183,7 +1198,7 @@ def create_soil_texture_chart_html(soil_data, location_name):
     ]
     
     for comp in components:
-        height_percent = comp['value'] * 2.5  # Scale factor for visibility
+        height_percent = comp['value'] * 2.5
         chart_html += f'''
             <div style="display: flex; flex-direction: column; align-items: center; width: 120px;">
                 <div style="width: 80px; background: {comp['color']}; height: {height_percent}px; 
@@ -1209,7 +1224,6 @@ def create_som_gauge_html(soil_data, location_name):
     """Create a simple HTML gauge for soil organic matter"""
     som_value = soil_data['final_som_estimate']
     
-    # Determine color based on value
     if som_value < 1.5:
         color = '#FF4444'
         status = "Depleted"
@@ -1220,7 +1234,7 @@ def create_som_gauge_html(soil_data, location_name):
         color = '#44FF44'
         status = "Rich"
     
-    percentage = (som_value / 6) * 100  # Max 6%
+    percentage = (som_value / 6) * 100
     
     chart_html = f'''
     <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; margin: 0; width: 100%; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
@@ -1260,7 +1274,6 @@ def create_climate_temp_gauge_html(climate_data):
     """Create a simple HTML gauge for temperature"""
     temp = climate_data['mean_temperature']
     
-    # Determine color based on value
     if temp < 0:
         color = '#4A90E2'
         status = "Cold"
@@ -1274,7 +1287,7 @@ def create_climate_temp_gauge_html(climate_data):
         color = '#FF4444'
         status = "Hot"
     
-    percentage = ((temp + 20) / 65) * 100  # Range -20 to 45
+    percentage = ((temp + 20) / 65) * 100
     
     chart_html = f'''
     <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
@@ -1302,7 +1315,6 @@ def create_climate_precip_gauge_html(climate_data):
     """Create a simple HTML gauge for precipitation"""
     precip = climate_data['mean_precipitation']
     
-    # Determine color based on value
     if precip < 250:
         color = '#FF4444'
         status = "Arid"
@@ -1319,7 +1331,7 @@ def create_climate_precip_gauge_html(climate_data):
         color = '#800080'
         status = "Very Humid"
     
-    percentage = (precip / 3000) * 100  # Max 3000mm
+    percentage = (precip / 3000) * 100
     
     chart_html = f'''
     <div style="background: #1E1E1E; border-radius: 12px; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
@@ -1361,8 +1373,13 @@ def display_chart(chart_html):
 
 def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tinyllama=True):
     ct = chart_type.lower()
+    
+    # Debug print
+    print(f"show_ai_interpretation called for {chart_type}")
+    print(f"  use_tinyllama: {use_tinyllama}")
+    print(f"  llm is None: {llm is None}")
+    print(f"  LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
 
-    # Pick label based on chart type
     if "climate classification" in ct:
         label = "🌾 Field Briefing — Agroclimate Assessment"
     elif "monthly temperature" in ct and "vegetation" not in ct:
@@ -1394,10 +1411,8 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     else:
         label = "🌾 AI Data Insight"
 
-    # Use a container instead of an expander to ensure visibility
     st.markdown(f'<div style="margin-top: 1.5rem;">', unsafe_allow_html=True)
     
-    # Add a visual header for the AI section
     st.markdown(f'''
     <div class="ai-header">
         <div class="ai-header-line"></div>
@@ -1406,9 +1421,11 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     ''', unsafe_allow_html=True)
     
     if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
+        print("✅ Attempting TinyLlama inference")
         with st.spinner("🦙 TinyLlama is analyzing..."):
             tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
         if tl_result:
+            print("✅ TinyLlama succeeded")
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
                 f'<span style="font-size:1.2rem;">🦙</span>'
@@ -1420,6 +1437,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
             )
             st.markdown(f'<div class="ai-interpretation">{tl_result}</div>', unsafe_allow_html=True)
         else:
+            print("❌ TinyLlama failed, using fallback")
             rule_based = get_smart_interpretation(chart_type, data_summary, location)
             st.markdown(
                 '<div style="color:#FFAA44;font-size:0.8rem;margin-bottom:0.4rem;">⚠️ TinyLlama inference failed — showing rule-based analysis</div>',
@@ -1427,6 +1445,7 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
             )
             st.markdown(f'<div class="ai-interpretation">{rule_based}</div>', unsafe_allow_html=True)
     else:
+        print("⚠️ Using rule-based fallback")
         rule_based = get_smart_interpretation(chart_type, data_summary, location)
         ai_source = "GIS Intelligence Engine"
         if not LLAMA_AVAILABLE:
@@ -1465,6 +1484,7 @@ def init_session():
         "tinyllama_enabled": True,
         "tinyllama_loaded": False,
         "tinyllama_download_attempted": False,
+        "llm_instance": None,  # Store llm in session state
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1553,6 +1573,18 @@ with st.sidebar:
     st.write(f"tinyllama_loaded: {st.session_state.tinyllama_loaded}")
     st.write(f"tinyllama_enabled: {st.session_state.tinyllama_enabled}")
     st.write(f"Current step: {st.session_state.current_step}")
+    st.write(f"LLM in session state: {st.session_state.llm_instance is not None}")
+    
+    st.markdown("### 🔍 Model Status")
+    if not LLAMA_AVAILABLE:
+        st.error("❌ llama-cpp-python is NOT installed")
+        st.info("Run: pip install llama-cpp-python")
+    elif not MODEL_PATH.exists():
+        st.warning("⚠️ Model file not downloaded yet")
+    elif not st.session_state.tinyllama_loaded:
+        st.warning("⚠️ Model exists but not loaded")
+    else:
+        st.success("✅ Model should be loaded")
     
     st.markdown("---")
     st.markdown("### 🦙 TinyLlama AI")
@@ -1563,10 +1595,22 @@ with st.sidebar:
         )
     elif LLAMA_AVAILABLE and MODEL_PATH.exists():
         st.info("🦙 Model on disk — loading...")
+        if st.button("🔄 Manually Load Model"):
+            with st.spinner("Loading..."):
+                _llm, _err = load_tinyllama_model()
+                if _llm:
+                    st.session_state.tinyllama_loaded = True
+                    st.session_state.tinyllama_enabled = True
+                    st.session_state.llm_instance = _llm
+                    st.success("Loaded!")
+                    st.rerun()
+                else:
+                    st.error(f"Failed: {_err}")
     elif LLAMA_AVAILABLE:
         st.info("🦙 Model not downloaded yet.\nScroll up and click the download button.")
     else:
         st.warning("🦙 TinyLlama not available.\nInstall llama-cpp-python to enable.")
+        st.code("pip install llama-cpp-python")
     
     st.markdown("---")
     st.markdown("### ⚙️ Settings")
@@ -1586,7 +1630,8 @@ st.markdown("""
 # AUTO-LOAD TINYLLAMA ON STARTUP (with graceful fallback)
 # =============================================================================
 
-llm = None
+# Initialize llm from session state
+llm = st.session_state.llm_instance
 
 # If model file doesn't exist yet and llama-cpp is available, show download banner
 if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
@@ -1615,6 +1660,7 @@ if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllam
             if _llm:
                 st.session_state.tinyllama_loaded = True
                 st.session_state.tinyllama_enabled = True
+                st.session_state.llm_instance = _llm
                 llm = _llm
                 st.success("🦙 TinyLlama loaded! AI analysis is now active on all charts.", icon="✅")
                 st.rerun()
@@ -1630,15 +1676,18 @@ elif LLAMA_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_
         if _llm:
             st.session_state.tinyllama_loaded = True
             st.session_state.tinyllama_enabled = True
+            st.session_state.llm_instance = _llm
             llm = _llm
             st.success("🦙 TinyLlama loaded successfully!")
         else:
             st.warning(f"🦙 TinyLlama model found but failed to load: {_err}")
 
-elif st.session_state.tinyllama_loaded and LLAMA_AVAILABLE:
-    # Already loaded in a previous rerun — retrieve from cache
+# Always try to get the cached model if loaded
+if st.session_state.tinyllama_loaded and LLAMA_AVAILABLE and st.session_state.llm_instance is None:
     _llm, _ = load_tinyllama_model()
-    llm = _llm
+    if _llm:
+        st.session_state.llm_instance = _llm
+        llm = _llm
 
 st.markdown(progress_bar_html(st.session_state.current_step), unsafe_allow_html=True)
 
@@ -1756,7 +1805,17 @@ with col1:
         st.markdown('<div class="card-header"><div class="card-icon">📊</div><h3 style="margin:0;">Results</h3></div>', unsafe_allow_html=True)
         st.success(f"✅ Analysis complete for **{location_name}**")
 
-        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE) else "🤖 GIS Intelligence"
+        # Debug: Show model status in results
+        if st.session_state.tinyllama_enabled:
+            if st.session_state.llm_instance is not None:
+                st.sidebar.success(f"✅ TinyLlama model is loaded and ready")
+                st.sidebar.info(f"Model in session state: {type(st.session_state.llm_instance)}")
+            else:
+                st.sidebar.warning("⚠️ TinyLlama enabled but model object is None in session state")
+        else:
+            st.sidebar.info("ℹ️ TinyLlama is disabled")
+
+        ai_status = "🦙 TinyLlama 1.1B" if (st.session_state.tinyllama_enabled and st.session_state.llm_instance is not None and LLAMA_AVAILABLE) else "🤖 GIS Intelligence"
         ai_note = " (TinyLlama not installed)" if not LLAMA_AVAILABLE else ""
         st.markdown(f"""<div style="background:rgba(0,255,136,0.08);padding:0.75rem;border-radius:8px;margin-bottom:1rem;">
             <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">{ai_status}{ai_note}: ✅ Ready<br>
@@ -1794,6 +1853,9 @@ with col2:
         soil_data = st.session_state.get("soil_data")
         climate_cls = st.session_state.get("climate_classification")
         veg_results = st.session_state.get("vegetation_results")
+        
+        # Get llm from session state
+        llm = st.session_state.llm_instance
         use_tl = st.session_state.tinyllama_enabled and llm is not None and LLAMA_AVAILABLE
 
         if st.session_state.analysis_type == "Climate & Soil":
@@ -1809,7 +1871,6 @@ with col2:
                         st.metric("💧 Annual Precip", f"{climate_cls['mean_precipitation']:.0f} mm")
                     st.info(f"**Climate Zone:** {climate_cls['climate_zone']}")
                     
-                    # Create gauges
                     col_g1, col_g2 = st.columns(2)
                     with col_g1:
                         temp_gauge = create_climate_temp_gauge_html(climate_cls)
@@ -1839,11 +1900,9 @@ with col2:
                     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌡️ Temperature", "💧 Water", "🌱 Soil Moisture", "📊 Distribution", "📋 Data Table"])
 
                     with tab1:
-                        # Temperature chart
                         temp_chart = create_temperature_chart_html(climate_df, location_name)
                         display_chart(temp_chart)
                         
-                        # Metrics
                         col_t1, col_t2, col_t3, col_t4 = st.columns(4)
                         with col_t1: 
                             st.metric("Avg Temp", f"{climate_df['temperature_2m'].mean():.1f}°C")
@@ -1858,7 +1917,6 @@ with col2:
                         with col_t4: 
                             st.metric("Range", f"{(climate_df['temperature_2m'].max() - climate_df['temperature_2m'].min()):.1f}°C")
                         
-                        # Data summary for AI
                         temps = climate_df['temperature_2m'].tolist()
                         months = climate_df['month_name'].tolist()
                         hot_months = [m for m, t in zip(months, temps) if t > 30]
@@ -1876,11 +1934,9 @@ with col2:
                         show_ai_interpretation("Monthly Temperature", data_summary, location_name, llm, use_tl)
 
                     with tab2:
-                        # Precipitation chart
                         precip_chart = create_precipitation_chart_html(climate_df, location_name)
                         display_chart(precip_chart)
                         
-                        # Metrics
                         col_p1, col_p2, col_p3 = st.columns(3)
                         with col_p1: 
                             st.metric("Annual Total", f"{climate_df['total_precipitation'].sum():.0f} mm")
@@ -1891,7 +1947,6 @@ with col2:
                             balance = climate_df['total_precipitation'].sum() - climate_df.get('potential_evaporation', pd.Series([0]*12)).sum()
                             st.metric("Water Balance", f"{balance:.0f} mm", delta="Surplus" if balance > 0 else "Deficit")
                         
-                        # Data summary
                         precip = climate_df['total_precipitation'].tolist()
                         pmonths = climate_df['month_name'].tolist()
                         dry_months = [m for m, p in zip(pmonths, precip) if p < 20]
@@ -1906,11 +1961,9 @@ with col2:
                         show_ai_interpretation("Precipitation & Evapotranspiration", data_summary, location_name, llm, use_tl)
 
                     with tab3:
-                        # Soil moisture chart
                         soil_chart = create_soil_moisture_chart_html(climate_df, location_name)
                         display_chart(soil_chart)
                         
-                        # Metrics
                         col_s1, col_s2, col_s3 = st.columns(3)
                         with col_s1: 
                             st.metric("Surface (0-7cm)", f"{climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³")
@@ -1927,7 +1980,6 @@ with col2:
                         show_ai_interpretation("Soil Moisture by Layer", data_summary, location_name, llm, use_tl)
 
                     with tab4:
-                        # Distribution chart
                         dist_chart = create_soil_distribution_chart_html(climate_df)
                         display_chart(dist_chart)
                         
@@ -2043,7 +2095,6 @@ with col2:
                         trend_dir = "increasing" if trend > 0.001 else ("decreasing" if trend < -0.001 else "stable")
                         mean_v = np.mean(vals)
                         
-                        # Health category per index
                         if idx_name == "NDVI":
                             health = "dense healthy canopy" if mean_v > 0.6 else ("moderate vegetation" if mean_v > 0.4 else ("sparse/stressed" if mean_v > 0.2 else "bare/very sparse"))
                         elif idx_name == "EVI":
