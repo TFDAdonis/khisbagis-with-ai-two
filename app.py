@@ -8,6 +8,14 @@ import os
 import requests
 from pathlib import Path
 
+# Try to import llama_cpp, but don't fail if it's not available
+try:
+    from llama_cpp import Llama
+    LLAMA_AVAILABLE = True
+except ImportError:
+    LLAMA_AVAILABLE = False
+    Llama = None
+
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
