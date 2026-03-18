@@ -218,6 +218,23 @@ st.markdown("""
         display: inline-block;
         margin-right: 4px;
     }
+    .ai-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 1rem 0 0.5rem 0;
+    }
+    .ai-header-line {
+        width: 4px;
+        height: 24px;
+        background: #00FF88;
+        border-radius: 2px;
+    }
+    .ai-header-text {
+        color: #FFFFFF;
+        font-weight: 600;
+        font-size: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1237,13 +1254,13 @@ def create_climate_precip_gauge_html(climate_data):
 
 
 # =============================================================================
-# AI INTERPRETATION DISPLAY
+# AI INTERPRETATION DISPLAY - FIXED VERSION
 # =============================================================================
 
 def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tinyllama=True):
     ct = chart_type.lower()
 
-    # Pick expander label based on chart type
+    # Pick label based on chart type
     if "climate classification" in ct:
         label = "🌾 Field Briefing — Agroclimate Assessment"
     elif "monthly temperature" in ct and "vegetation" not in ct:
@@ -1275,42 +1292,54 @@ def show_ai_interpretation(chart_type, data_summary, location, llm=None, use_tin
     else:
         label = "🌾 AI Data Insight"
 
-    with st.expander(label, expanded=True):
-        if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
-            with st.spinner("TinyLlama is thinking..."):
-                tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
-            if tl_result:
-                st.markdown(
-                    f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
-                    f'<span style="font-size:1.2rem;">🦙</span>'
-                    f'<span style="color:#00FF88;font-weight:600;font-size:0.85rem;">TinyLlama 1.1B</span>'
-                    f'<span style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);'
-                    f'border-radius:20px;padding:1px 8px;font-size:0.7rem;color:#00FF88;">AI</span>'
-                    f'</div>',
-                    unsafe_allow_html=True
-                )
-                st.markdown(tl_result)
-            else:
-                rule_based = get_smart_interpretation(chart_type, data_summary, location)
-                st.markdown(
-                    '<div style="color:#FFAA44;font-size:0.8rem;margin-bottom:0.4rem;">⚠️ TinyLlama inference failed — showing rule-based analysis</div>',
-                    unsafe_allow_html=True
-                )
-                st.markdown(rule_based)
-        else:
-            rule_based = get_smart_interpretation(chart_type, data_summary, location)
-            ai_source = "GIS Intelligence Engine"
-            if not LLAMA_AVAILABLE:
-                ai_source = "GIS Intelligence Engine (TinyLlama not installed)"
-            
+    # Use a container instead of an expander to ensure visibility
+    st.markdown(f'<div style="margin-top: 1rem;">', unsafe_allow_html=True)
+    
+    # Add a visual header for the AI section
+    st.markdown(f'''
+    <div class="ai-header">
+        <div class="ai-header-line"></div>
+        <span class="ai-header-text">{label}</span>
+    </div>
+    ''', unsafe_allow_html=True)
+    
+    if use_tinyllama and llm is not None and LLAMA_AVAILABLE:
+        with st.spinner("🦙 TinyLlama is analyzing..."):
+            tl_result = tinyllama_interpret(llm, chart_type, data_summary, location)
+        if tl_result:
             st.markdown(
                 f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
-                f'<span style="font-size:1.1rem;">🤖</span>'
-                f'<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">{ai_source}</span>'
+                f'<span style="font-size:1.2rem;">🦙</span>'
+                f'<span style="color:#00FF88;font-weight:600;font-size:0.85rem;">TinyLlama 1.1B</span>'
+                f'<span style="background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.3);'
+                f'border-radius:20px;padding:1px 8px;font-size:0.7rem;color:#00FF88;">AI</span>'
                 f'</div>',
                 unsafe_allow_html=True
             )
-            st.markdown(rule_based)
+            st.markdown(f'<div class="ai-interpretation">{tl_result}</div>', unsafe_allow_html=True)
+        else:
+            rule_based = get_smart_interpretation(chart_type, data_summary, location)
+            st.markdown(
+                '<div style="color:#FFAA44;font-size:0.8rem;margin-bottom:0.4rem;">⚠️ TinyLlama inference failed — showing rule-based analysis</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown(f'<div class="ai-interpretation">{rule_based}</div>', unsafe_allow_html=True)
+    else:
+        rule_based = get_smart_interpretation(chart_type, data_summary, location)
+        ai_source = "GIS Intelligence Engine"
+        if not LLAMA_AVAILABLE:
+            ai_source = "GIS Intelligence Engine (TinyLlama not installed)"
+        
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">'
+            f'<span style="font-size:1.1rem;">🤖</span>'
+            f'<span style="color:#4A90E2;font-weight:600;font-size:0.85rem;">{ai_source}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(f'<div class="ai-interpretation">{rule_based}</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -1412,6 +1441,37 @@ def progress_bar_html(step):
 # MAIN UI
 # =============================================================================
 
+# Debug sidebar
+with st.sidebar:
+    st.markdown("### 🐛 Debug Info")
+    st.write(f"LLAMA_AVAILABLE: {LLAMA_AVAILABLE}")
+    st.write(f"Model exists: {MODEL_PATH.exists()}")
+    if MODEL_PATH.exists():
+        st.write(f"Model size: {MODEL_PATH.stat().st_size / (1024**2):.1f} MB")
+    st.write(f"tinyllama_loaded: {st.session_state.tinyllama_loaded}")
+    st.write(f"tinyllama_enabled: {st.session_state.tinyllama_enabled}")
+    st.write(f"Current step: {st.session_state.current_step}")
+    
+    st.markdown("---")
+    st.markdown("### 🦙 TinyLlama AI")
+    if LLAMA_AVAILABLE and st.session_state.tinyllama_loaded:
+        st.success("TinyLlama 1.1B ✅", icon="🦙")
+        st.session_state.tinyllama_enabled = st.toggle(
+            "Enable AI Analysis", value=st.session_state.tinyllama_enabled
+        )
+    elif LLAMA_AVAILABLE and MODEL_PATH.exists():
+        st.info("🦙 Model on disk — loading...")
+    elif LLAMA_AVAILABLE:
+        st.info("🦙 Model not downloaded yet.\nScroll up and click the download button.")
+    else:
+        st.warning("🦙 TinyLlama not available.\nInstall llama-cpp-python to enable.")
+    
+    st.markdown("---")
+    st.markdown("### ⚙️ Settings")
+    st.session_state.analysis_type = st.radio(
+        "Analysis Mode", ["Climate & Soil", "Vegetation & Climate"], index=0
+    )
+
 # Header
 st.markdown("""
 <div style="padding: 0.5rem 0 1rem 0;">
@@ -1426,13 +1486,8 @@ st.markdown("""
 
 llm = None
 
-# Check if llama-cpp is available
-if not LLAMA_AVAILABLE:
-    st.sidebar.info("🦙 TinyLlama AI: Disabled (package not installed) - using rule-based analysis")
-    st.session_state.tinyllama_enabled = False
-
 # If model file doesn't exist yet and llama-cpp is available, show download banner
-elif not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
+if LLAMA_AVAILABLE and not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempted:
     st.markdown("""
     <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);
          border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem;">
@@ -1466,41 +1521,22 @@ elif not MODEL_PATH.exists() and not st.session_state.tinyllama_download_attempt
         else:
             st.error(f"Download failed: {err}")
 
-elif MODEL_PATH.exists() and not st.session_state.tinyllama_loaded and LLAMA_AVAILABLE:
+elif LLAMA_AVAILABLE and MODEL_PATH.exists() and not st.session_state.tinyllama_loaded:
     # Model already on disk — load it (cached, fast after first time)
-    _llm, _err = load_tinyllama_model()
-    if _llm:
-        st.session_state.tinyllama_loaded = True
-        st.session_state.tinyllama_enabled = True
-        llm = _llm
-    else:
-        st.warning(f"🦙 TinyLlama model found but failed to load: {_err}")
+    with st.spinner("🦙 Loading TinyLlama model..."):
+        _llm, _err = load_tinyllama_model()
+        if _llm:
+            st.session_state.tinyllama_loaded = True
+            st.session_state.tinyllama_enabled = True
+            llm = _llm
+            st.success("🦙 TinyLlama loaded successfully!")
+        else:
+            st.warning(f"🦙 TinyLlama model found but failed to load: {_err}")
 
 elif st.session_state.tinyllama_loaded and LLAMA_AVAILABLE:
     # Already loaded in a previous rerun — retrieve from cache
     _llm, _ = load_tinyllama_model()
     llm = _llm
-
-# Sidebar — status + settings
-with st.sidebar:
-    st.markdown("### 🦙 TinyLlama AI")
-    if LLAMA_AVAILABLE and st.session_state.tinyllama_loaded and llm is not None:
-        st.success("TinyLlama 1.1B ✅", icon="🦙")
-        st.session_state.tinyllama_enabled = st.toggle(
-            "Enable AI Analysis", value=st.session_state.tinyllama_enabled
-        )
-    elif LLAMA_AVAILABLE and MODEL_PATH.exists():
-        st.info("🦙 Model on disk — loading...")
-    elif LLAMA_AVAILABLE:
-        st.info("🦙 Model not downloaded yet.\nScroll up and click the download button.")
-    else:
-        st.warning("🦙 TinyLlama not available.\nInstall llama-cpp-python to enable.")
-    
-    st.markdown("---")
-    st.markdown("### ⚙️ Settings")
-    st.session_state.analysis_type = st.radio(
-        "Analysis Mode", ["Climate & Soil", "Vegetation & Climate"], index=0
-    )
 
 st.markdown(progress_bar_html(st.session_state.current_step), unsafe_allow_html=True)
 
@@ -1660,246 +1696,319 @@ with col2:
 
         if st.session_state.analysis_type == "Climate & Soil":
             # Climate Classification
-            st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-            st.markdown('<div style="margin-bottom:1rem;"><h3 style="margin:0;">🌤️ Climate Classification</h3></div>', unsafe_allow_html=True)
-            if climate_cls:
-                cm1, cm2 = st.columns(2)
-                with cm1:
-                    st.metric("🌡️ Mean Annual Temp", f"{climate_cls['mean_temperature']:.1f}°C")
-                with cm2:
-                    st.metric("💧 Annual Precip", f"{climate_cls['mean_precipitation']:.0f} mm")
-                st.info(f"**Climate Zone:** {climate_cls['climate_zone']}")
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown(create_climate_temp_gauge_html(climate_cls), unsafe_allow_html=True)
-                with c2:
-                    st.markdown(create_climate_precip_gauge_html(climate_cls), unsafe_allow_html=True)
-                arid = climate_cls.get('aridity_index', 0)
-                water_stress = "severe drought stress" if arid < 0.5 else ("moderate water stress" if arid < 1.0 else ("balanced water regime" if arid < 2.0 else "humid surplus"))
-                data_summary = (
-                    f"Climate zone: {climate_cls['climate_zone']}, "
-                    f"Mean annual temperature: {climate_cls['mean_temperature']:.1f}°C, "
-                    f"Annual precipitation: {climate_cls['mean_precipitation']:.0f}mm, "
-                    f"Aridity index: {arid:.2f} ({water_stress}), "
-                    f"Season character: {'hot dry summers + mild winters' if 'Mediterranean' in climate_cls['climate_zone'] else 'see climate zone'}"
-                )
-                show_ai_interpretation("Climate Classification gauge", data_summary, location_name, llm, use_tl)
-            st.markdown('</div>', unsafe_allow_html=True)
+            with st.container():
+                st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                st.markdown('<div style="margin-bottom:1rem;"><h3 style="margin:0;">🌤️ Climate Classification</h3></div>', unsafe_allow_html=True)
+                if climate_cls:
+                    col_m1, col_m2 = st.columns(2)
+                    with col_m1:
+                        st.metric("🌡️ Mean Annual Temp", f"{climate_cls['mean_temperature']:.1f}°C")
+                    with col_m2:
+                        st.metric("💧 Annual Precip", f"{climate_cls['mean_precipitation']:.0f} mm")
+                    st.info(f"**Climate Zone:** {climate_cls['climate_zone']}")
+                    
+                    # Create gauges
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        temp_gauge = create_climate_temp_gauge_html(climate_cls)
+                        if temp_gauge:
+                            st.markdown(temp_gauge, unsafe_allow_html=True)
+                    with col_g2:
+                        precip_gauge = create_climate_precip_gauge_html(climate_cls)
+                        if precip_gauge:
+                            st.markdown(precip_gauge, unsafe_allow_html=True)
+                    
+                    arid = climate_cls.get('aridity_index', 0)
+                    water_stress = "severe drought stress" if arid < 0.5 else ("moderate water stress" if arid < 1.0 else ("balanced water regime" if arid < 2.0 else "humid surplus"))
+                    data_summary = (
+                        f"Climate zone: {climate_cls['climate_zone']}, "
+                        f"Mean annual temperature: {climate_cls['mean_temperature']:.1f}°C, "
+                        f"Annual precipitation: {climate_cls['mean_precipitation']:.0f}mm, "
+                        f"Aridity index: {arid:.2f} ({water_stress})"
+                    )
+                    show_ai_interpretation("Climate Classification gauge", data_summary, location_name, llm, use_tl)
+                st.markdown('</div>', unsafe_allow_html=True)
 
             if climate_df is not None and not climate_df.empty:
-                st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">📊 Climate Data</h3></div>', unsafe_allow_html=True)
-                tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌡️ Temperature", "💧 Water", "🌱 Soil Moisture", "📊 Distribution", "📋 Data Table"])
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">📊 Climate Data</h3></div>', unsafe_allow_html=True)
+                    
+                    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌡️ Temperature", "💧 Water", "🌱 Soil Moisture", "📊 Distribution", "📋 Data Table"])
 
-                with tab1:
-                    st.markdown(create_temperature_chart_html(climate_df, location_name), unsafe_allow_html=True)
-                    c1, c2, c3, c4 = st.columns(4)
-                    with c1: st.metric("Avg Temp", f"{climate_df['temperature_2m'].mean():.1f}°C")
-                    with c2:
-                        max_t = climate_df['temperature_2m'].max()
-                        max_m = climate_df.loc[climate_df['temperature_2m'].idxmax(), 'month_name']
-                        st.metric("Max Temp", f"{max_t:.1f}°C", delta=f"in {max_m}")
-                    with c3:
-                        min_t = climate_df['temperature_2m'].min()
-                        min_m = climate_df.loc[climate_df['temperature_2m'].idxmin(), 'month_name']
-                        st.metric("Min Temp", f"{min_t:.1f}°C", delta=f"in {min_m}")
-                    with c4: st.metric("Range", f"{(climate_df['temperature_2m'].max() - climate_df['temperature_2m'].min()):.1f}°C")
-                    temps = climate_df['temperature_2m'].tolist()
-                    months = climate_df['month_name'].tolist()
-                    temp_pairs = ", ".join([f"{m}: {t:.1f}°C" for m, t in zip(months, temps)])
-                    hot_months = [m for m, t in zip(months, temps) if t > 30]
-                    cold_months = [m for m, t in zip(months, temps) if t < 5]
-                    grow_months = [m for m, t in zip(months, temps) if 10 <= t <= 30]
-                    data_summary = (
-                        f"Monthly temperatures: {temp_pairs}. "
-                        f"Peak: {climate_df['temperature_2m'].max():.1f}°C in {climate_df.loc[climate_df['temperature_2m'].idxmax(),'month_name']}. "
-                        f"Coldest: {climate_df['temperature_2m'].min():.1f}°C in {climate_df.loc[climate_df['temperature_2m'].idxmin(),'month_name']}. "
-                        f"Seasonal range: {climate_df['temperature_2m'].max() - climate_df['temperature_2m'].min():.1f}°C. "
-                        + (f"Heat-stress months (>30°C): {', '.join(hot_months)}. " if hot_months else "No heat-stress months. ")
-                        + (f"Frost-risk months (<5°C): {', '.join(cold_months)}. " if cold_months else "No frost-risk months. ")
-                        + f"Optimal growing window (10–30°C): {len(grow_months)} months ({', '.join(grow_months)})."
-                    )
-                    show_ai_interpretation("Monthly Temperature", data_summary, location_name, llm, use_tl)
+                    with tab1:
+                        # Temperature chart
+                        temp_chart = create_temperature_chart_html(climate_df, location_name)
+                        if temp_chart:
+                            st.markdown(temp_chart, unsafe_allow_html=True)
+                        
+                        # Metrics
+                        col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+                        with col_t1: 
+                            st.metric("Avg Temp", f"{climate_df['temperature_2m'].mean():.1f}°C")
+                        with col_t2:
+                            max_t = climate_df['temperature_2m'].max()
+                            max_m = climate_df.loc[climate_df['temperature_2m'].idxmax(), 'month_name']
+                            st.metric("Max Temp", f"{max_t:.1f}°C", delta=f"in {max_m}")
+                        with col_t3:
+                            min_t = climate_df['temperature_2m'].min()
+                            min_m = climate_df.loc[climate_df['temperature_2m'].idxmin(), 'month_name']
+                            st.metric("Min Temp", f"{min_t:.1f}°C", delta=f"in {min_m}")
+                        with col_t4: 
+                            st.metric("Range", f"{(climate_df['temperature_2m'].max() - climate_df['temperature_2m'].min()):.1f}°C")
+                        
+                        # Data summary for AI
+                        temps = climate_df['temperature_2m'].tolist()
+                        months = climate_df['month_name'].tolist()
+                        hot_months = [m for m, t in zip(months, temps) if t > 30]
+                        cold_months = [m for m, t in zip(months, temps) if t < 5]
+                        grow_months = [m for m, t in zip(months, temps) if 10 <= t <= 30]
+                        
+                        data_summary = (
+                            f"Monthly temperatures range from {min(temps):.1f}°C to {max(temps):.1f}°C. "
+                            f"Peak: {max_t:.1f}°C in {max_m}. "
+                            f"Coldest: {min_t:.1f}°C in {min_m}. "
+                            f"Heat-stress months (>30°C): {len(hot_months)}. "
+                            f"Frost-risk months (<5°C): {len(cold_months)}. "
+                            f"Optimal growing window (10–30°C): {len(grow_months)} months."
+                        )
+                        show_ai_interpretation("Monthly Temperature", data_summary, location_name, llm, use_tl)
 
-                with tab2:
-                    st.markdown(create_precipitation_chart_html(climate_df, location_name), unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.metric("Annual Total", f"{climate_df['total_precipitation'].sum():.0f} mm")
-                    with c2:
-                        if 'potential_evaporation' in climate_df.columns:
-                            st.metric("Annual ET", f"{climate_df['potential_evaporation'].sum():.0f} mm")
-                    with c3:
-                        balance = climate_df['total_precipitation'].sum() - climate_df.get('potential_evaporation', pd.Series([0]*12)).sum()
-                        st.metric("Water Balance", f"{balance:.0f} mm", delta="Surplus" if balance > 0 else "Deficit")
-                    precip = climate_df['total_precipitation'].tolist()
-                    pmonths = climate_df['month_name'].tolist()
-                    precip_pairs = ", ".join([f"{m}: {p:.0f}mm" for m, p in zip(pmonths, precip)])
-                    dry_months = [m for m, p in zip(pmonths, precip) if p < 20]
-                    wet_months = [m for m, p in zip(pmonths, precip) if p > 80]
-                    annual_total = climate_df['total_precipitation'].sum()
-                    et_total = climate_df['potential_evaporation'].sum() if 'potential_evaporation' in climate_df.columns else 0
-                    water_balance = annual_total - et_total
-                    data_summary = (
-                        f"Monthly rainfall: {precip_pairs}. "
-                        f"Annual total: {annual_total:.0f}mm. "
-                        f"Peak: {climate_df.loc[climate_df['total_precipitation'].idxmax(),'month_name']} ({climate_df['total_precipitation'].max():.0f}mm). "
-                        + (f"Dry months (<20mm): {len(dry_months)} ({', '.join(dry_months)}). " if dry_months else "No dry months. ")
-                        + (f"Wet months (>80mm): {len(wet_months)} ({', '.join(wet_months)}). " if wet_months else "")
-                        + (f"Annual ET: {et_total:.0f}mm. Water balance: {water_balance:+.0f}mm ({'surplus' if water_balance > 0 else 'deficit'})." if et_total else "")
-                    )
-                    show_ai_interpretation("Precipitation & Evapotranspiration", data_summary, location_name, llm, use_tl)
+                    with tab2:
+                        # Precipitation chart
+                        precip_chart = create_precipitation_chart_html(climate_df, location_name)
+                        if precip_chart:
+                            st.markdown(precip_chart, unsafe_allow_html=True)
+                        
+                        # Metrics
+                        col_p1, col_p2, col_p3 = st.columns(3)
+                        with col_p1: 
+                            st.metric("Annual Total", f"{climate_df['total_precipitation'].sum():.0f} mm")
+                        with col_p2:
+                            if 'potential_evaporation' in climate_df.columns:
+                                st.metric("Annual ET", f"{climate_df['potential_evaporation'].sum():.0f} mm")
+                        with col_p3:
+                            balance = climate_df['total_precipitation'].sum() - climate_df.get('potential_evaporation', pd.Series([0]*12)).sum()
+                            st.metric("Water Balance", f"{balance:.0f} mm", delta="Surplus" if balance > 0 else "Deficit")
+                        
+                        # Data summary
+                        precip = climate_df['total_precipitation'].tolist()
+                        pmonths = climate_df['month_name'].tolist()
+                        dry_months = [m for m, p in zip(pmonths, precip) if p < 20]
+                        annual_total = climate_df['total_precipitation'].sum()
+                        
+                        data_summary = (
+                            f"Annual total precipitation: {annual_total:.0f}mm. "
+                            f"Peak month: {climate_df.loc[climate_df['total_precipitation'].idxmax(),'month_name']} ({climate_df['total_precipitation'].max():.0f}mm). "
+                            f"Dry months (<20mm): {len(dry_months)}. "
+                            f"Water balance: {balance:+.0f}mm ({'surplus' if balance > 0 else 'deficit'})."
+                        )
+                        show_ai_interpretation("Precipitation & Evapotranspiration", data_summary, location_name, llm, use_tl)
 
-                with tab3:
-                    st.markdown(create_soil_moisture_chart_html(climate_df, location_name), unsafe_allow_html=True)
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.metric("Surface (0-7cm)", f"{climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³")
-                    with c2: st.metric("Root Zone (7-28cm)", f"{climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³")
-                    with c3: st.metric("Deep (28-100cm)", f"{climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³")
-                    data_summary = (
-                        f"Mean surface moisture: {climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³, "
-                        f"Root zone: {climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³, "
-                        f"Deep zone: {climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³, "
-                        f"Wettest month: {climate_df.loc[climate_df['soil_moisture_0_7cm'].idxmax(),'month_name']}"
-                    )
-                    show_ai_interpretation("Soil Moisture by Layer", data_summary, location_name, llm, use_tl)
+                    with tab3:
+                        # Soil moisture chart
+                        soil_chart = create_soil_moisture_chart_html(climate_df, location_name)
+                        if soil_chart:
+                            st.markdown(soil_chart, unsafe_allow_html=True)
+                        
+                        # Metrics
+                        col_s1, col_s2, col_s3 = st.columns(3)
+                        with col_s1: 
+                            st.metric("Surface (0-7cm)", f"{climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³")
+                        with col_s2: 
+                            st.metric("Root Zone (7-28cm)", f"{climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³")
+                        with col_s3: 
+                            st.metric("Deep (28-100cm)", f"{climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³")
+                        
+                        data_summary = (
+                            f"Mean surface moisture: {climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³, "
+                            f"Root zone: {climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³, "
+                            f"Deep zone: {climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³"
+                        )
+                        show_ai_interpretation("Soil Moisture by Layer", data_summary, location_name, llm, use_tl)
 
-                with tab4:
-                    st.markdown(create_soil_distribution_chart_html(climate_df), unsafe_allow_html=True)
-                    st.markdown("""<div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;">
-                        <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">
-                        <strong>Soil Moisture Interpretation:</strong><br>
-                        • <span style="color:#00FF88">Surface (0-7cm):</span> Rapid rainfall response, high evaporation<br>
-                        • <span style="color:#4A90E2">Root Zone (7-28cm):</span> Available for plant uptake<br>
-                        • <span style="color:#FFAA44">Deep (28-100cm):</span> Groundwater recharge zone</p></div>""", unsafe_allow_html=True)
-                    data_summary = (
-                        f"Surface avg: {climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³, "
-                        f"Root zone avg: {climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³, "
-                        f"Deep avg: {climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³"
-                    )
-                    show_ai_interpretation("Soil Moisture Distribution comparison", data_summary, location_name, llm, use_tl)
+                    with tab4:
+                        # Distribution chart
+                        dist_chart = create_soil_distribution_chart_html(climate_df)
+                        if dist_chart:
+                            st.markdown(dist_chart, unsafe_allow_html=True)
+                        
+                        st.markdown("""
+                        <div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;margin-top:1rem;">
+                            <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">
+                            <strong>Soil Moisture Interpretation:</strong><br>
+                            • <span style="color:#00FF88">Surface (0-7cm):</span> Rapid rainfall response, high evaporation<br>
+                            • <span style="color:#4A90E2">Root Zone (7-28cm):</span> Available for plant uptake<br>
+                            • <span style="color:#FFAA44">Deep (28-100cm):</span> Groundwater recharge zone
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        data_summary = (
+                            f"Surface avg: {climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³, "
+                            f"Root zone avg: {climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³, "
+                            f"Deep avg: {climate_df['soil_moisture_28_100cm'].mean():.3f} m³/m³"
+                        )
+                        show_ai_interpretation("Soil Moisture Distribution", data_summary, location_name, llm, use_tl)
 
-                with tab5:
-                    st.dataframe(
-                        climate_df[['month_name','temperature_2m','total_precipitation','soil_moisture_0_7cm','soil_moisture_7_28cm','soil_moisture_28_100cm']].rename(columns={
-                            'month_name': 'Month', 'temperature_2m': 'Temp (°C)', 'total_precipitation': 'Precip (mm)',
-                            'soil_moisture_0_7cm': 'SM Surface', 'soil_moisture_7_28cm': 'SM Root', 'soil_moisture_28_100cm': 'SM Deep'
-                        }),
-                        use_container_width=True, hide_index=True
-                    )
-                st.markdown('</div>', unsafe_allow_html=True)
+                    with tab5:
+                        st.dataframe(
+                            climate_df[['month_name','temperature_2m','total_precipitation',
+                                       'soil_moisture_0_7cm','soil_moisture_7_28cm','soil_moisture_28_100cm']].rename(columns={
+                                'month_name': 'Month', 
+                                'temperature_2m': 'Temp (°C)', 
+                                'total_precipitation': 'Precip (mm)',
+                                'soil_moisture_0_7cm': 'SM Surface', 
+                                'soil_moisture_7_28cm': 'SM Root', 
+                                'soil_moisture_28_100cm': 'SM Deep'
+                            }),
+                            use_container_width=True, 
+                            hide_index=True
+                        )
+                    st.markdown('</div>', unsafe_allow_html=True)
 
             if soil_data:
-                st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌱 Soil Properties</h3></div>', unsafe_allow_html=True)
-                c1, c2, c3 = st.columns(3)
-                with c1: st.metric("🏔️ Texture", soil_data['texture_name'])
-                with c2: st.metric("🌿 SOM", f"{soil_data['final_som_estimate']:.2f}%")
-                with c3: st.metric("📦 SOC Stock", f"{soil_data['soc_stock']:.1f} t/ha")
-                cs1, cs2 = st.columns(2)
-                with cs1:
-                    st.markdown(create_soil_texture_chart_html(soil_data, location_name), unsafe_allow_html=True)
-                    clay = soil_data['clay_content']
-                    silt = soil_data['silt_content']
-                    sand = soil_data['sand_content']
-                    tex = soil_data['texture_name']
-                    compaction_risk = "high" if clay > 40 else ("moderate" if clay > 25 else "low")
-                    drainage = "slow" if clay > 40 else ("moderate" if clay > 20 else "fast")
-                    data_summary = (
-                        f"Texture class: {tex}. Clay: {clay}%, Silt: {silt}%, Sand: {sand}%. "
-                        f"Compaction risk: {compaction_risk}. Drainage: {drainage}. "
-                        f"{'High clay content — good nutrient retention but tillage challenges.' if clay > 35 else ''}"
-                        f"{'Silty loam — excellent workability and water-holding.' if 30 < silt < 50 and clay < 30 else ''}"
-                        f"{'Sandy component dominant — low water retention, leaching risk.' if sand > 60 else ''}"
-                        f" pH context: estimated {'acidic 5.5–6.5' if clay < 20 else 'neutral 6.5–7.5' if clay < 40 else 'alkaline 7.0–8.0'}."
-                    )
-                    show_ai_interpretation("Soil Texture Composition", data_summary, location_name, llm, use_tl)
-                with cs2:
-                    st.markdown(create_som_gauge_html(soil_data, location_name), unsafe_allow_html=True)
-                    som = soil_data['final_som_estimate']
-                    soc = soil_data['soc_stock']
-                    bd = soil_data.get('bulk_density', 1.3)
-                    depth = soil_data.get('depth_cm', 30)
-                    fertility = "very high" if som > 4 else ("high" if som > 2.5 else ("medium" if som > 1.5 else ("low" if som > 0.8 else "critically low")))
-                    data_summary = (
-                        f"Soil Organic Matter: {som:.2f}% ({fertility} fertility). "
-                        f"SOC Stock: {soc:.1f} t C/ha over {depth}cm depth. "
-                        f"Bulk density: {bd} g/cm³ ({'compacted' if bd > 1.5 else 'normal' if bd > 1.2 else 'loose'}). "
-                        f"{'Organic matter critically low — soil biology depleted, fertility inputs essential.' if som < 1.0 else ''}"
-                        f"{'Medium SOM — building carbon reserves would meaningfully improve water retention.' if 1.0 <= som < 2.0 else ''}"
-                        f"{'Good SOM level — supports active microbial life and nitrogen cycling.' if som >= 2.0 else ''}"
-                        f" Estimated N mineralization: {(som * 30):.0f} kg N/ha/year."
-                    )
-                    show_ai_interpretation("Soil Organic Matter gauge", data_summary, location_name, llm, use_tl)
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌱 Soil Properties</h3></div>', unsafe_allow_html=True)
+                    
+                    col_p1, col_p2, col_p3 = st.columns(3)
+                    with col_p1: 
+                        st.metric("🏔️ Texture", soil_data['texture_name'])
+                    with col_p2: 
+                        st.metric("🌿 SOM", f"{soil_data['final_som_estimate']:.2f}%")
+                    with col_p3: 
+                        st.metric("📦 SOC Stock", f"{soil_data['soc_stock']:.1f} t/ha")
+                    
+                    col_tex, col_som = st.columns(2)
+                    with col_tex:
+                        tex_chart = create_soil_texture_chart_html(soil_data, location_name)
+                        if tex_chart:
+                            st.markdown(tex_chart, unsafe_allow_html=True)
+                        
+                        clay = soil_data['clay_content']
+                        silt = soil_data['silt_content']
+                        sand = soil_data['sand_content']
+                        tex = soil_data['texture_name']
+                        compaction_risk = "high" if clay > 40 else ("moderate" if clay > 25 else "low")
+                        drainage = "slow" if clay > 40 else ("moderate" if clay > 20 else "fast")
+                        data_summary = (
+                            f"Texture class: {tex}. Clay: {clay}%, Silt: {silt}%, Sand: {sand}%. "
+                            f"Compaction risk: {compaction_risk}. Drainage: {drainage}. "
+                            f"{'High clay content — good nutrient retention but tillage challenges.' if clay > 35 else ''}"
+                            f"{'Silty loam — excellent workability and water-holding.' if 30 < silt < 50 and clay < 30 else ''}"
+                            f"{'Sandy component dominant — low water retention, leaching risk.' if sand > 60 else ''}"
+                        )
+                        show_ai_interpretation("Soil Texture Composition", data_summary, location_name, llm, use_tl)
+                    
+                    with col_som:
+                        som_chart = create_som_gauge_html(soil_data, location_name)
+                        if som_chart:
+                            st.markdown(som_chart, unsafe_allow_html=True)
+                        
+                        som = soil_data['final_som_estimate']
+                        soc = soil_data['soc_stock']
+                        fertility = "very high" if som > 4 else ("high" if som > 2.5 else ("medium" if som > 1.5 else ("low" if som > 0.8 else "critically low")))
+                        data_summary = (
+                            f"Soil Organic Matter: {som:.2f}% ({fertility} fertility). "
+                            f"SOC Stock: {soc:.1f} t C/ha. "
+                            f"{'Organic matter critically low — soil biology depleted, fertility inputs essential.' if som < 1.0 else ''}"
+                            f"{'Medium SOM — building carbon reserves would meaningfully improve water retention.' if 1.0 <= som < 2.0 else ''}"
+                            f"{'Good SOM level — supports active microbial life and nitrogen cycling.' if som >= 2.0 else ''}"
+                        )
+                        show_ai_interpretation("Soil Organic Matter gauge", data_summary, location_name, llm, use_tl)
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
 
         else:  # Vegetation & Climate
             if veg_results:
-                st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌿 Vegetation Indices</h3></div>', unsafe_allow_html=True)
-                for idx_name, data in veg_results.items():
-                    st.markdown(f"**{idx_name}**")
-                    st.markdown(create_vegetation_chart_html(data['dates'], data['values'], idx_name, location_name), unsafe_allow_html=True)
-                    vals = data['values']
-                    c1, c2, c3 = st.columns(3)
-                    with c1: st.metric(f"{idx_name} Mean", f"{np.mean(vals):.3f}")
-                    with c2: st.metric(f"{idx_name} Max", f"{np.max(vals):.3f}")
-                    with c3: st.metric(f"{idx_name} Min", f"{np.min(vals):.3f}")
-                    trend = np.polyfit(range(len(vals)), vals, 1)[0]
-                    trend_dir = "increasing" if trend > 0.001 else ("decreasing" if trend < -0.001 else "stable")
-                    mean_v = np.mean(vals)
-                    peak_month_idx = int(np.argmax(vals))
-                    low_month_idx = int(np.argmin(vals))
-                    # Health category per index
-                    if idx_name == "NDVI":
-                        health = "dense healthy canopy" if mean_v > 0.6 else ("moderate vegetation" if mean_v > 0.4 else ("sparse/stressed" if mean_v > 0.2 else "bare/very sparse"))
-                    elif idx_name == "EVI":
-                        health = "high biomass" if mean_v > 0.5 else ("moderate canopy" if mean_v > 0.3 else "low biomass")
-                    elif idx_name == "NDWI":
-                        health = "well-watered canopy" if mean_v > 0.2 else ("mild water stress" if mean_v > -0.1 else "significant water stress")
-                    elif idx_name == "SAVI":
-                        health = "good ground cover" if mean_v > 0.4 else ("partial cover" if mean_v > 0.2 else "sparse/degraded")
-                    elif idx_name == "GNDVI":
-                        health = "high chlorophyll/N" if mean_v > 0.5 else ("adequate chlorophyll" if mean_v > 0.35 else "chlorophyll/N deficient")
-                    else:
-                        health = "moderate" if mean_v > 0.4 else "low"
-                    variability = np.std(vals)
-                    seasonality = "strong seasonal pulse" if variability > 0.08 else ("moderate seasonality" if variability > 0.04 else "low variability — evergreen or uniform cover")
-                    data_summary = (
-                        f"{idx_name} 24-month time series. Mean: {mean_v:.3f} ({health}). "
-                        f"Max: {np.max(vals):.3f} (month {peak_month_idx+1}). Min: {np.min(vals):.3f} (month {low_month_idx+1}). "
-                        f"Trend: {trend_dir} at {abs(trend):.4f}/month over 2 years. "
-                        f"Variability (std): {variability:.3f} — {seasonality}. "
-                        f"{'2-year decline suggests vegetation degradation or land use change.' if trend < -0.002 else ''}"
-                        f"{'Sustained growth trend — positive land cover change.' if trend > 0.002 else ''}"
-                    )
-                    show_ai_interpretation(f"{idx_name} vegetation index time series", data_summary, location_name, llm, use_tl)
-                    st.markdown("---")
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container():
+                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                    st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌿 Vegetation Indices</h3></div>', unsafe_allow_html=True)
+                    
+                    for idx_name, data in veg_results.items():
+                        st.markdown(f"**{idx_name}**")
+                        veg_chart = create_vegetation_chart_html(data['dates'], data['values'], idx_name, location_name)
+                        if veg_chart:
+                            st.markdown(veg_chart, unsafe_allow_html=True)
+                        
+                        vals = data['values']
+                        col_v1, col_v2, col_v3 = st.columns(3)
+                        with col_v1: 
+                            st.metric(f"{idx_name} Mean", f"{np.mean(vals):.3f}")
+                        with col_v2: 
+                            st.metric(f"{idx_name} Max", f"{np.max(vals):.3f}")
+                        with col_v3: 
+                            st.metric(f"{idx_name} Min", f"{np.min(vals):.3f}")
+                        
+                        trend = np.polyfit(range(len(vals)), vals, 1)[0]
+                        trend_dir = "increasing" if trend > 0.001 else ("decreasing" if trend < -0.001 else "stable")
+                        mean_v = np.mean(vals)
+                        
+                        # Health category per index
+                        if idx_name == "NDVI":
+                            health = "dense healthy canopy" if mean_v > 0.6 else ("moderate vegetation" if mean_v > 0.4 else ("sparse/stressed" if mean_v > 0.2 else "bare/very sparse"))
+                        elif idx_name == "EVI":
+                            health = "high biomass" if mean_v > 0.5 else ("moderate canopy" if mean_v > 0.3 else "low biomass")
+                        elif idx_name == "NDWI":
+                            health = "well-watered canopy" if mean_v > 0.2 else ("mild water stress" if mean_v > -0.1 else "significant water stress")
+                        elif idx_name == "SAVI":
+                            health = "good ground cover" if mean_v > 0.4 else ("partial cover" if mean_v > 0.2 else "sparse/degraded")
+                        elif idx_name == "GNDVI":
+                            health = "high chlorophyll/N" if mean_v > 0.5 else ("adequate chlorophyll" if mean_v > 0.35 else "chlorophyll/N deficient")
+                        else:
+                            health = "moderate" if mean_v > 0.4 else "low"
+                        
+                        variability = np.std(vals)
+                        seasonality = "strong seasonal pulse" if variability > 0.08 else ("moderate seasonality" if variability > 0.04 else "low variability — evergreen or uniform cover")
+                        
+                        data_summary = (
+                            f"{idx_name} 24-month time series. Mean: {mean_v:.3f} ({health}). "
+                            f"Max: {np.max(vals):.3f}. Min: {np.min(vals):.3f}. "
+                            f"Trend: {trend_dir}. "
+                            f"Variability (std): {variability:.3f} — {seasonality}. "
+                            f"{'2-year decline suggests vegetation degradation or land use change.' if trend < -0.002 else ''}"
+                            f"{'Sustained growth trend — positive land cover change.' if trend > 0.002 else ''}"
+                        )
+                        show_ai_interpretation(f"{idx_name} vegetation index", data_summary, location_name, llm, use_tl)
+                        st.markdown("---")
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
 
                 if climate_df is not None:
-                    st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
-                    st.markdown('<h3 style="margin:0 0 0.5rem 0;">🌤️ Climate Data</h3>', unsafe_allow_html=True)
-                    st.markdown(create_temperature_chart_html(climate_df, location_name), unsafe_allow_html=True)
-                    vt = climate_df['temperature_2m'].tolist()
-                    vm = climate_df['month_name'].tolist()
-                    grow_window = [m for m, t in zip(vm, vt) if t >= 10]
-                    data_summary = (
-                        f"Monthly temperatures: {', '.join([f'{m}:{t:.1f}°C' for m,t in zip(vm,vt)])}. "
-                        f"Thermal growing season: {len(grow_window)} months ({', '.join(grow_window)}). "
-                        f"Peak warmth: {max(vt):.1f}°C in {vm[vt.index(max(vt))]}. "
-                        f"Cold floor: {min(vt):.1f}°C in {vm[vt.index(min(vt))]}. "
-                        f"Annual range: {max(vt)-min(vt):.1f}°C."
-                    )
-                    show_ai_interpretation("Monthly Temperature for vegetation context", data_summary, location_name, llm, use_tl)
-                    st.markdown(create_precipitation_chart_html(climate_df, location_name), unsafe_allow_html=True)
-                    vp = climate_df['total_precipitation'].tolist()
-                    green_months = [m for m, p in zip(vm, vp) if p >= 30]
-                    data_summary = (
-                        f"Monthly rainfall: {', '.join([f'{m}:{p:.0f}mm' for m,p in zip(vm,vp)])}. "
-                        f"Annual total: {sum(vp):.0f}mm. "
-                        f"Rain-supported growing months (≥30mm): {len(green_months)} ({', '.join(green_months)}). "
-                        f"Peak rainfall: {max(vp):.0f}mm in {vm[vp.index(max(vp))]}. "
-                        f"Dry season length: {12-len(green_months)} months."
-                    )
-                    show_ai_interpretation("Monthly Precipitation for vegetation context", data_summary, location_name, llm, use_tl)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    with st.container():
+                        st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
+                        st.markdown('<h3 style="margin:0 0 0.5rem 0;">🌤️ Climate Data</h3>', unsafe_allow_html=True)
+                        
+                        temp_chart = create_temperature_chart_html(climate_df, location_name)
+                        if temp_chart:
+                            st.markdown(temp_chart, unsafe_allow_html=True)
+                        
+                        vt = climate_df['temperature_2m'].tolist()
+                        vm = climate_df['month_name'].tolist()
+                        grow_window = [m for m, t in zip(vm, vt) if t >= 10]
+                        data_summary = (
+                            f"Monthly temperatures range from {min(vt):.1f}°C to {max(vt):.1f}°C. "
+                            f"Thermal growing season: {len(grow_window)} months. "
+                            f"Peak warmth: {max(vt):.1f}°C. "
+                            f"Cold floor: {min(vt):.1f}°C. "
+                            f"Annual range: {max(vt)-min(vt):.1f}°C."
+                        )
+                        show_ai_interpretation("Monthly Temperature for vegetation context", data_summary, location_name, llm, use_tl)
+                        
+                        precip_chart = create_precipitation_chart_html(climate_df, location_name)
+                        if precip_chart:
+                            st.markdown(precip_chart, unsafe_allow_html=True)
+                        
+                        vp = climate_df['total_precipitation'].tolist()
+                        green_months = [m for m, p in zip(vm, vp) if p >= 30]
+                        data_summary = (
+                            f"Monthly rainfall ranges from {min(vp):.0f}mm to {max(vp):.0f}mm. "
+                            f"Annual total: {sum(vp):.0f}mm. "
+                            f"Rain-supported growing months (≥30mm): {len(green_months)}. "
+                            f"Peak rainfall: {max(vp):.0f}mm. "
+                            f"Dry season length: {12-len(green_months)} months."
+                        )
+                        show_ai_interpretation("Monthly Precipitation for vegetation context", data_summary, location_name, llm, use_tl)
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
