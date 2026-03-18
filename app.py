@@ -145,7 +145,6 @@ st.markdown("""
         background: #00FF88 !important;
         color: #0A0A0A !important;
     }
-    .js-plotly-plot, .plotly { width: 100% !important; }
     .ai-interpretation {
         background: linear-gradient(135deg, rgba(0,255,136,0.08), rgba(0,204,106,0.08));
         border: 1px solid rgba(0,255,136,0.2);
@@ -179,10 +178,40 @@ st.markdown("""
         .card { padding: 1rem; }
         h1 { font-size: 1.5rem !important; }
     }
+    
+    /* Simple chart styles */
+    .simple-chart {
+        width: 100%;
+        height: 300px;
+        margin: 1rem 0;
+        position: relative;
+    }
+    .chart-bar {
+        display: inline-block;
+        background: linear-gradient(180deg, #00FF88 0%, #00CC6A 100%);
+        border-radius: 4px 4px 0 0;
+        margin: 0 2px;
+    }
+    .chart-line {
+        position: absolute;
+        height: 2px;
+        background: #FF6B6B;
+    }
+    .mini-legend {
+        display: flex;
+        gap: 1rem;
+        margin: 0.5rem 0;
+        font-size: 0.8rem;
+    }
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        display: inline-block;
+        margin-right: 4px;
+    }
 </style>
 """, unsafe_allow_html=True)
-
-import plotly.graph_objects as go
 
 # =============================================================================
 # TINYLLAMA MODEL
@@ -836,169 +865,367 @@ def get_climate_classification(location, region_type):
 
 
 # =============================================================================
-# CHART CREATION
+# SIMPLE HTML CHARTS (instead of Plotly)
 # =============================================================================
 
-def make_dark_layout(title_text="", height=350):
-    return dict(
-        title=dict(text=title_text, font=dict(size=15, color='#FFFFFF'), x=0.5),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#FFFFFF', size=12),
-        xaxis=dict(title='', gridcolor='#333333', tickfont=dict(size=11, color='#CCCCCC')),
-        yaxis=dict(gridcolor='#333333', tickfont=dict(size=11, color='#CCCCCC')),
-        height=height,
-        margin=dict(l=45, r=20, t=65, b=45),
-        hovermode='x unified',
-        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='center', x=0.5, font=dict(size=11)),
-    )
+def create_temperature_chart_html(df, location_name):
+    """Create a simple HTML temperature chart"""
+    months = df['month_name'].tolist()
+    temps = df['temperature_2m'].tolist()
+    
+    max_temp = max(temps)
+    min_temp = min(temps)
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Monthly Temperature</h4>
+            {accuracy_badge_html("high", "±1-2°C ERA5-Land")}
+        </div>
+        <div style="height: 200px; display: flex; align-items: flex-end; gap: 4px; margin: 20px 0;">
+    '''
+    
+    for i, (month, temp) in enumerate(zip(months, temps)):
+        height_percent = ((temp - min_temp) / (max_temp - min_temp + 0.1)) * 80 + 20
+        color = '#FF6B6B'
+        chart_html += f'''
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; background: {color}; height: {height_percent}px; 
+                           border-radius: 4px 4px 0 0; opacity: 0.8;" 
+                     title="{month}: {temp}°C"></div>
+                <div style="color: #CCCCCC; font-size: 0.7rem; margin-top: 4px;">{month}</div>
+            </div>
+        '''
+    
+    chart_html += '''
+        </div>
+        <div class="mini-legend">
+            <span><span class="legend-color" style="background: #FF6B6B;"></span> Mean Temperature (°C)</span>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_temperature_chart(df, location_name):
-    badge = accuracy_badge_html("high", "±1-2°C ERA5-Land")
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df['month_name'], y=df['temperature_2m'],
-        mode='lines+markers', name='Mean Temp',
-        line=dict(color='#FF6B6B', width=3, shape='spline', smoothing=1.3),
-        marker=dict(size=8, color='#FF6B6B', line=dict(width=1, color='#FFF')),
-        fill='tozeroy', fillcolor='rgba(255,107,107,0.08)'
-    ))
-    if 'temperature_max' in df.columns:
-        fig.add_trace(go.Scatter(x=df['month_name'], y=df['temperature_max'], mode='lines', name='Max Temp', line=dict(color='#FF4444', width=2, dash='dot')))
-        fig.add_trace(go.Scatter(x=df['month_name'], y=df['temperature_min'], mode='lines', name='Min Temp', line=dict(color='#4A90E2', width=2, dash='dot')))
-    layout = make_dark_layout(f'<b>Monthly Temperature</b> {badge}', 350)
-    layout['yaxis']['title'] = 'Temperature (°C)'
-    fig.update_layout(**layout)
-    return fig
+def create_precipitation_chart_html(df, location_name):
+    """Create a simple HTML precipitation chart"""
+    months = df['month_name'].tolist()
+    precip = df['total_precipitation'].tolist()
+    et = df['potential_evaporation'].tolist() if 'potential_evaporation' in df.columns else []
+    
+    max_precip = max(precip) if precip else 100
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Monthly Precipitation & ET</h4>
+            {accuracy_badge_html("medium", "±20-40% CHIRPS")}
+        </div>
+        <div style="height: 200px; display: flex; align-items: flex-end; gap: 4px; margin: 20px 0;">
+    '''
+    
+    for i, (month, p) in enumerate(zip(months, precip)):
+        height_percent = (p / max_precip) * 80 + 10 if max_precip > 0 else 10
+        chart_html += f'''
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; background: #4A90E2; height: {height_percent}px; 
+                           border-radius: 4px 4px 0 0; opacity: 0.8;" 
+                     title="{month}: {p}mm"></div>
+                <div style="color: #CCCCCC; font-size: 0.7rem; margin-top: 4px;">{month}</div>
+            </div>
+        '''
+    
+    chart_html += '''
+        </div>
+        <div class="mini-legend">
+            <span><span class="legend-color" style="background: #4A90E2;"></span> Precipitation (mm)</span>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_precipitation_chart(df, location_name):
-    badge = accuracy_badge_html("medium", "±20-40% CHIRPS")
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=df['month_name'], y=df['total_precipitation'], name='Precipitation', marker_color='#4A90E2', marker_line=dict(width=0), opacity=0.8))
-    if 'potential_evaporation' in df.columns:
-        fig.add_trace(go.Scatter(x=df['month_name'], y=df['potential_evaporation'], mode='lines', name='Evapotranspiration', line=dict(color='#FFAA44', width=2, dash='dot')))
-    layout = make_dark_layout(f'<b>Monthly Precipitation & ET</b> {badge}', 350)
-    layout['yaxis']['title'] = 'mm'
-    fig.update_layout(**layout)
-    return fig
+def create_soil_moisture_chart_html(df, location_name):
+    """Create a simple HTML soil moisture chart"""
+    months = df['month_name'].tolist()
+    surface = df['soil_moisture_0_7cm'].tolist()
+    root = df['soil_moisture_7_28cm'].tolist()
+    deep = df['soil_moisture_28_100cm'].tolist()
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Soil Moisture by Layer</h4>
+            {accuracy_badge_html("medium", "±0.05 m³/m³")}
+        </div>
+        <div style="height: 200px; display: flex; align-items: flex-end; gap: 4px; margin: 20px 0;">
+    '''
+    
+    for i, month in enumerate(months):
+        chart_html += f'''
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; display: flex; flex-direction: column-reverse; gap: 2px; height: 150px;">
+                    <div style="width: 100%; background: #FFAA44; height: {deep[i]*300}px; 
+                               border-radius: 2px;" title="Deep: {deep[i]} m³/m³"></div>
+                    <div style="width: 100%; background: #4A90E2; height: {root[i]*300}px; 
+                               border-radius: 2px;" title="Root: {root[i]} m³/m³"></div>
+                    <div style="width: 100%; background: #00FF88; height: {surface[i]*300}px; 
+                               border-radius: 2px;" title="Surface: {surface[i]} m³/m³"></div>
+                </div>
+                <div style="color: #CCCCCC; font-size: 0.7rem; margin-top: 4px;">{month}</div>
+            </div>
+        '''
+    
+    chart_html += '''
+        </div>
+        <div class="mini-legend">
+            <span><span class="legend-color" style="background: #00FF88;"></span> Surface (0-7cm)</span>
+            <span><span class="legend-color" style="background: #4A90E2;"></span> Root (7-28cm)</span>
+            <span><span class="legend-color" style="background: #FFAA44;"></span> Deep (28-100cm)</span>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_soil_moisture_chart(df, location_name):
-    badge = accuracy_badge_html("medium", "±0.05 m³/m³")
-    fig = go.Figure()
-    colors = {'soil_moisture_0_7cm': '#00FF88', 'soil_moisture_7_28cm': '#4A90E2', 'soil_moisture_28_100cm': '#FFAA44'}
-    labels = {'soil_moisture_0_7cm': 'Surface 0-7cm', 'soil_moisture_7_28cm': 'Root 7-28cm', 'soil_moisture_28_100cm': 'Deep 28-100cm'}
-    for col, color in colors.items():
-        if col in df.columns:
-            fig.add_trace(go.Scatter(x=df['month_name'], y=df[col], mode='lines+markers', name=labels[col], line=dict(color=color, width=2, shape='spline', smoothing=1.2), marker=dict(size=6)))
-    layout = make_dark_layout(f'<b>Soil Moisture by Layer</b> {badge}', 350)
-    layout['yaxis']['title'] = 'm³/m³'
-    fig.update_layout(**layout)
-    return fig
-
-
-def create_soil_distribution_chart(df):
-    fig = go.Figure()
-    cols = ['soil_moisture_0_7cm', 'soil_moisture_7_28cm', 'soil_moisture_28_100cm']
-    labels = ['Surface\n0-7cm', 'Root Zone\n7-28cm', 'Deep\n28-100cm']
-    means = [df[c].mean() for c in cols if c in df.columns]
+def create_soil_distribution_chart_html(df):
+    """Create a simple HTML soil distribution chart"""
+    surface_mean = df['soil_moisture_0_7cm'].mean()
+    root_mean = df['soil_moisture_7_28cm'].mean()
+    deep_mean = df['soil_moisture_28_100cm'].mean()
+    
+    max_val = max(surface_mean, root_mean, deep_mean)
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF;">Average Soil Moisture Distribution</h4>
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 200px; margin: 20px 0;">
+    '''
+    
+    labels = ['Surface<br>0-7cm', 'Root Zone<br>7-28cm', 'Deep<br>28-100cm']
+    values = [surface_mean, root_mean, deep_mean]
     colors = ['#00FF88', '#4A90E2', '#FFAA44']
-    fig.add_trace(go.Bar(x=labels[:len(means)], y=means, marker_color=colors[:len(means)], text=[f'{v:.3f}' for v in means], textposition='outside', textfont=dict(color='#FFFFFF', size=12)))
-    layout = make_dark_layout('<b>Average Soil Moisture Distribution</b>', 320)
-    layout['yaxis']['title'] = 'Average m³/m³'
-    layout['showlegend'] = False
-    fig.update_layout(**layout)
-    return fig
+    
+    for label, value, color in zip(labels, values, colors):
+        height_percent = (value / max_val) * 150 if max_val > 0 else 50
+        chart_html += f'''
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100px;">
+                <div style="width: 60px; background: {color}; height: {height_percent}px; 
+                           border-radius: 4px 4px 0 0; margin-bottom: 8px;" 
+                     title="{value:.3f} m³/m³"></div>
+                <div style="color: #FFFFFF; font-weight: 600;">{value:.3f}</div>
+                <div style="color: #CCCCCC; font-size: 0.8rem; text-align: center;">{label}</div>
+            </div>
+        '''
+    
+    chart_html += '''
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_vegetation_chart(dates, values, index_name, location_name):
-    color_map = {'NDVI': '#00FF88', 'EVI': '#FF6B6B', 'SAVI': '#4A90E2', 'NDWI': '#4A90E2', 'GNDVI': '#00CC6A', 'NBR': '#FF4444', 'SI': '#8B4513', 'NDSI_Salinity': '#DEB887', 'AWEI': '#87CEEB'}
+def create_vegetation_chart_html(dates, values, index_name, location_name):
+    """Create a simple HTML vegetation index chart"""
+    max_val = max(values) if values else 1
+    min_val = min(values) if values else 0
+    
+    color_map = {'NDVI': '#00FF88', 'EVI': '#FF6B6B', 'SAVI': '#4A90E2', 'NDWI': '#4A90E2', 
+                 'GNDVI': '#00CC6A', 'NBR': '#FF4444', 'SI': '#8B4513', 'NDSI_Salinity': '#DEB887', 'AWEI': '#87CEEB'}
     color = color_map.get(index_name, '#00FF88')
-    r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=dates, y=values, mode='lines+markers', name=index_name, line=dict(color=color, width=3, shape='spline', smoothing=1.3), marker=dict(size=7, color=color, line=dict(width=1, color='#FFF')), fill='tozeroy', fillcolor=f'rgba({r},{g},{b},0.1)'))
-    if len(values) > 1:
-        x_num = list(range(len(dates)))
-        z = np.polyfit(x_num, values, 1)
-        p = np.poly1d(z)
-        fig.add_trace(go.Scatter(x=dates, y=p(x_num).tolist(), mode='lines', name='Trend', line=dict(color='#FFAA44', width=2, dash='dot')))
-    badge = accuracy_badge_html("high", "±0.05 Sentinel-2")
-    layout = make_dark_layout(f'<b>{index_name} Time Series</b> {badge}', 320)
-    layout['yaxis']['title'] = f'{index_name} Value'
-    layout['yaxis']['range'] = [-1, 1] if index_name in ['NDWI', 'MNDWI', 'AWEI', 'EVI'] else [0, 1]
-    fig.update_layout(**layout)
-    return fig
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">{index_name} Time Series</h4>
+            {accuracy_badge_html("high", "±0.05 Sentinel-2")}
+        </div>
+        <div style="height: 200px; display: flex; align-items: flex-end; gap: 2px; margin: 20px 0;">
+    '''
+    
+    for i, (date, val) in enumerate(zip(dates[::3], values[::3])):  # Show every 3rd point for readability
+        height_percent = ((val - min_val) / (max_val - min_val + 0.01)) * 150 + 20 if max_val > min_val else 100
+        chart_html += f'''
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; background: {color}; height: {height_percent}px; 
+                           border-radius: 2px; opacity: 0.8;" 
+                     title="{date}: {val}"></div>
+                <div style="color: #CCCCCC; font-size: 0.6rem; margin-top: 4px; transform: rotate(-45deg);">{date}</div>
+            </div>
+        '''
+    
+    chart_html += f'''
+        </div>
+        <div class="mini-legend">
+            <span><span class="legend-color" style="background: {color};"></span> {index_name}</span>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_soil_texture_chart(soil_data, location_name):
-    badge = accuracy_badge_html("medium", "±25% ISDASoil")
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=['Clay', 'Silt', 'Sand'], y=[soil_data['clay_content'], soil_data['silt_content'], soil_data['sand_content']], marker_color=['#8B4513', '#DEB887', '#F4A460'], text=[f"{v}%" for v in [soil_data['clay_content'], soil_data['silt_content'], soil_data['sand_content']]], textposition='outside', textfont=dict(size=14, color='#FFFFFF'), width=0.6))
-    layout = make_dark_layout(f'<b>Soil Texture Composition</b> {badge}', 380)
-    layout['yaxis']['title'] = 'Percentage (%)'
-    layout['yaxis']['range'] = [0, 105]
-    layout['showlegend'] = False
-    fig.update_layout(**layout)
-    return fig
+def create_soil_texture_chart_html(soil_data, location_name):
+    """Create a simple HTML soil texture chart"""
+    clay = soil_data['clay_content']
+    silt = soil_data['silt_content']
+    sand = soil_data['sand_content']
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Soil Texture Composition</h4>
+            {accuracy_badge_html("medium", "±25% ISDASoil")}
+        </div>
+        <div style="display: flex; align-items: flex-end; justify-content: space-around; height: 200px; margin: 20px 0;">
+    '''
+    
+    components = [
+        {'name': 'Clay', 'value': clay, 'color': '#8B4513'},
+        {'name': 'Silt', 'value': silt, 'color': '#DEB887'},
+        {'name': 'Sand', 'value': sand, 'color': '#F4A460'}
+    ]
+    
+    for comp in components:
+        chart_html += f'''
+            <div style="display: flex; flex-direction: column; align-items: center; width: 80px;">
+                <div style="width: 50px; background: {comp['color']}; height: {comp['value']*2}px; 
+                           border-radius: 4px 4px 0 0; margin-bottom: 8px;" 
+                     title="{comp['name']}: {comp['value']}%"></div>
+                <div style="color: #FFFFFF; font-weight: 600;">{comp['value']}%</div>
+                <div style="color: #CCCCCC; font-size: 0.9rem;">{comp['name']}</div>
+            </div>
+        '''
+    
+    chart_html += '''
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_som_gauge(soil_data, location_name):
-    badge = accuracy_badge_html("medium", "±20% GSOC")
+def create_som_gauge_html(soil_data, location_name):
+    """Create a simple HTML gauge for soil organic matter"""
     som_value = soil_data['final_som_estimate']
-    fig = go.Figure()
-    fig.add_trace(go.Indicator(
-        mode="gauge+number+delta",
-        value=round(som_value, 2),
-        number=dict(font=dict(size=24, color='#FFFFFF'), suffix='%'),
-        gauge=dict(
-            axis=dict(range=[0, 6], tickwidth=1, tickcolor="#CCCCCC"),
-            bar=dict(color="#00FF88", thickness=0.3),
-            bgcolor="#333333",
-            borderwidth=2, bordercolor="#444444",
-            steps=[dict(range=[0, 1.5], color="#FF4444"), dict(range=[1.5, 3], color="#FFAA44"), dict(range=[3, 6], color="#44FF44")]
-        ),
-        title=dict(text=f"<b>Soil Organic Matter</b> {badge}", font=dict(size=14, color='#FFFFFF'))
-    ))
-    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#FFFFFF'), height=350, margin=dict(l=30, r=30, t=80, b=30))
-    return fig
+    
+    # Determine color based on value
+    if som_value < 1.5:
+        color = '#FF4444'
+    elif som_value < 3:
+        color = '#FFAA44'
+    else:
+        color = '#44FF44'
+    
+    percentage = (som_value / 6) * 100  # Max 6%
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem; margin: 1rem 0;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="margin: 0; color: #FFFFFF;">Soil Organic Matter</h4>
+            {accuracy_badge_html("medium", "±20% GSOC")}
+        </div>
+        <div style="text-align: center; padding: 1rem;">
+            <div style="position: relative; width: 200px; height: 100px; margin: 0 auto; overflow: hidden;">
+                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 100px; 
+                           background: linear-gradient(90deg, #FF4444 0%, #FFAA44 50%, #44FF44 100%);
+                           border-radius: 100px 100px 0 0;"></div>
+                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 4px; height: 100px; 
+                           background: white; transform: translateX(-2px);"></div>
+            </div>
+            <div style="font-size: 2rem; font-weight: 600; color: {color}; margin: 0.5rem 0;">
+                {som_value:.2f}%
+            </div>
+            <div style="display: flex; justify-content: space-between; color: #CCCCCC; font-size: 0.8rem;">
+                <span>Depleted</span>
+                <span>Moderate</span>
+                <span>Rich</span>
+            </div>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_climate_temp_gauge(climate_data):
-    fig = go.Figure()
-    fig.add_trace(go.Indicator(
-        mode="gauge+number",
-        value=round(climate_data['mean_temperature'], 1),
-        number=dict(font=dict(size=24, color='#FFFFFF'), suffix='°C'),
-        gauge=dict(
-            axis=dict(range=[-20, 45], tickwidth=1, tickcolor="#CCCCCC"),
-            bar=dict(color="#FF6B6B", thickness=0.3),
-            bgcolor="#333333", borderwidth=2, bordercolor="#444444",
-            steps=[dict(range=[-20, 0], color="#4A90E2"), dict(range=[0, 18], color="#44AA44"), dict(range=[18, 30], color="#FFAA44"), dict(range=[30, 45], color="#FF4444")]
-        ),
-        title=dict(text="<b>Mean Annual Temp</b>", font=dict(size=13, color='#FFFFFF'))
-    ))
-    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#FFFFFF'), height=250, margin=dict(l=30, r=30, t=70, b=30))
-    return fig
+def create_climate_temp_gauge_html(climate_data):
+    """Create a simple HTML gauge for temperature"""
+    temp = climate_data['mean_temperature']
+    
+    # Determine color based on value
+    if temp < 0:
+        color = '#4A90E2'
+    elif temp < 18:
+        color = '#44AA44'
+    elif temp < 30:
+        color = '#FFAA44'
+    else:
+        color = '#FF4444'
+    
+    percentage = ((temp + 20) / 65) * 100  # Range -20 to 45
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem;">
+        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF;">Mean Annual Temp</h4>
+        <div style="text-align: center;">
+            <div style="position: relative; width: 150px; height: 75px; margin: 0 auto; overflow: hidden;">
+                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 75px; 
+                           background: linear-gradient(90deg, #4A90E2 0%, #44AA44 30%, #FFAA44 70%, #FF4444 100%);
+                           border-radius: 75px 75px 0 0;"></div>
+                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 4px; height: 75px; 
+                           background: white; transform: translateX(-2px);"></div>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 600; color: {color}; margin: 0.5rem 0;">
+                {temp:.1f}°C
+            </div>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
-def create_climate_precip_gauge(climate_data):
-    fig = go.Figure()
-    fig.add_trace(go.Indicator(
-        mode="gauge+number",
-        value=round(climate_data['mean_precipitation']),
-        number=dict(font=dict(size=24, color='#FFFFFF'), suffix=' mm'),
-        gauge=dict(
-            axis=dict(range=[0, 3000], tickwidth=1, tickcolor="#CCCCCC"),
-            bar=dict(color="#4A90E2", thickness=0.3),
-            bgcolor="#333333", borderwidth=2, bordercolor="#444444",
-            steps=[dict(range=[0, 250], color="#FF4444"), dict(range=[250, 500], color="#FFAA44"), dict(range=[500, 1000], color="#44AA44"), dict(range=[1000, 2000], color="#4A90E2"), dict(range=[2000, 3000], color="#800080")]
-        ),
-        title=dict(text="<b>Annual Precipitation</b>", font=dict(size=13, color='#FFFFFF'))
-    ))
-    fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color='#FFFFFF'), height=250, margin=dict(l=30, r=30, t=70, b=30))
-    return fig
+def create_climate_precip_gauge_html(climate_data):
+    """Create a simple HTML gauge for precipitation"""
+    precip = climate_data['mean_precipitation']
+    
+    # Determine color based on value
+    if precip < 250:
+        color = '#FF4444'
+    elif precip < 500:
+        color = '#FFAA44'
+    elif precip < 1000:
+        color = '#44AA44'
+    elif precip < 2000:
+        color = '#4A90E2'
+    else:
+        color = '#800080'
+    
+    percentage = (precip / 3000) * 100  # Max 3000mm
+    
+    chart_html = f'''
+    <div style="background: #1E1E1E; border-radius: 12px; padding: 1rem;">
+        <h4 style="margin: 0 0 1rem 0; color: #FFFFFF;">Annual Precipitation</h4>
+        <div style="text-align: center;">
+            <div style="position: relative; width: 150px; height: 75px; margin: 0 auto; overflow: hidden;">
+                <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 75px; 
+                           background: linear-gradient(90deg, #FF4444 0%, #FFAA44 20%, #44AA44 40%, #4A90E2 70%, #800080 90%);
+                           border-radius: 75px 75px 0 0;"></div>
+                <div style="position: absolute; bottom: 0; left: {percentage}%; width: 4px; height: 75px; 
+                           background: white; transform: translateX(-2px);"></div>
+            </div>
+            <div style="font-size: 1.8rem; font-weight: 600; color: {color}; margin: 0.5rem 0;">
+                {precip:.0f} mm
+            </div>
+        </div>
+    </div>
+    '''
+    
+    return chart_html
 
 
 # =============================================================================
@@ -1424,9 +1651,9 @@ with col2:
                 st.info(f"**Climate Zone:** {climate_cls['climate_zone']}")
                 c1, c2 = st.columns(2)
                 with c1:
-                    st.plotly_chart(create_climate_temp_gauge(climate_cls), use_container_width=True)
+                    st.markdown(create_climate_temp_gauge_html(climate_cls), unsafe_allow_html=True)
                 with c2:
-                    st.plotly_chart(create_climate_precip_gauge(climate_cls), use_container_width=True)
+                    st.markdown(create_climate_precip_gauge_html(climate_cls), unsafe_allow_html=True)
                 arid = climate_cls.get('aridity_index', 0)
                 water_stress = "severe drought stress" if arid < 0.5 else ("moderate water stress" if arid < 1.0 else ("balanced water regime" if arid < 2.0 else "humid surplus"))
                 data_summary = (
@@ -1445,7 +1672,7 @@ with col2:
                 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌡️ Temperature", "💧 Water", "🌱 Soil Moisture", "📊 Distribution", "📋 Data Table"])
 
                 with tab1:
-                    st.plotly_chart(create_temperature_chart(climate_df, location_name), use_container_width=True)
+                    st.markdown(create_temperature_chart_html(climate_df, location_name), unsafe_allow_html=True)
                     c1, c2, c3, c4 = st.columns(4)
                     with c1: st.metric("Avg Temp", f"{climate_df['temperature_2m'].mean():.1f}°C")
                     with c2:
@@ -1475,7 +1702,7 @@ with col2:
                     show_ai_interpretation("Monthly Temperature", data_summary, location_name, llm, use_tl)
 
                 with tab2:
-                    st.plotly_chart(create_precipitation_chart(climate_df, location_name), use_container_width=True)
+                    st.markdown(create_precipitation_chart_html(climate_df, location_name), unsafe_allow_html=True)
                     c1, c2, c3 = st.columns(3)
                     with c1: st.metric("Annual Total", f"{climate_df['total_precipitation'].sum():.0f} mm")
                     with c2:
@@ -1503,7 +1730,7 @@ with col2:
                     show_ai_interpretation("Precipitation & Evapotranspiration", data_summary, location_name, llm, use_tl)
 
                 with tab3:
-                    st.plotly_chart(create_soil_moisture_chart(climate_df, location_name), use_container_width=True)
+                    st.markdown(create_soil_moisture_chart_html(climate_df, location_name), unsafe_allow_html=True)
                     c1, c2, c3 = st.columns(3)
                     with c1: st.metric("Surface (0-7cm)", f"{climate_df['soil_moisture_0_7cm'].mean():.3f} m³/m³")
                     with c2: st.metric("Root Zone (7-28cm)", f"{climate_df['soil_moisture_7_28cm'].mean():.3f} m³/m³")
@@ -1517,7 +1744,7 @@ with col2:
                     show_ai_interpretation("Soil Moisture by Layer", data_summary, location_name, llm, use_tl)
 
                 with tab4:
-                    st.plotly_chart(create_soil_distribution_chart(climate_df), use_container_width=True)
+                    st.markdown(create_soil_distribution_chart_html(climate_df), unsafe_allow_html=True)
                     st.markdown("""<div style="background:rgba(255,255,255,0.04);padding:1rem;border-radius:12px;">
                         <p style="color:#CCCCCC;margin:0;font-size:0.85rem;">
                         <strong>Soil Moisture Interpretation:</strong><br>
@@ -1550,7 +1777,7 @@ with col2:
                 with c3: st.metric("📦 SOC Stock", f"{soil_data['soc_stock']:.1f} t/ha")
                 cs1, cs2 = st.columns(2)
                 with cs1:
-                    st.plotly_chart(create_soil_texture_chart(soil_data, location_name), use_container_width=True)
+                    st.markdown(create_soil_texture_chart_html(soil_data, location_name), unsafe_allow_html=True)
                     clay = soil_data['clay_content']
                     silt = soil_data['silt_content']
                     sand = soil_data['sand_content']
@@ -1567,7 +1794,7 @@ with col2:
                     )
                     show_ai_interpretation("Soil Texture Composition", data_summary, location_name, llm, use_tl)
                 with cs2:
-                    st.plotly_chart(create_som_gauge(soil_data, location_name), use_container_width=True)
+                    st.markdown(create_som_gauge_html(soil_data, location_name), unsafe_allow_html=True)
                     som = soil_data['final_som_estimate']
                     soc = soil_data['soc_stock']
                     bd = soil_data.get('bulk_density', 1.3)
@@ -1591,8 +1818,7 @@ with col2:
                 st.markdown('<div style="margin-bottom:0.5rem;"><h3 style="margin:0;">🌿 Vegetation Indices</h3></div>', unsafe_allow_html=True)
                 for idx_name, data in veg_results.items():
                     st.markdown(f"**{idx_name}**")
-                    fig = create_vegetation_chart(data['dates'], data['values'], idx_name, location_name)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.markdown(create_vegetation_chart_html(data['dates'], data['values'], idx_name, location_name), unsafe_allow_html=True)
                     vals = data['values']
                     c1, c2, c3 = st.columns(3)
                     with c1: st.metric(f"{idx_name} Mean", f"{np.mean(vals):.3f}")
@@ -1633,7 +1859,7 @@ with col2:
                 if climate_df is not None:
                     st.markdown('<div class="card chart-container">', unsafe_allow_html=True)
                     st.markdown('<h3 style="margin:0 0 0.5rem 0;">🌤️ Climate Data</h3>', unsafe_allow_html=True)
-                    st.plotly_chart(create_temperature_chart(climate_df, location_name), use_container_width=True)
+                    st.markdown(create_temperature_chart_html(climate_df, location_name), unsafe_allow_html=True)
                     vt = climate_df['temperature_2m'].tolist()
                     vm = climate_df['month_name'].tolist()
                     grow_window = [m for m, t in zip(vm, vt) if t >= 10]
@@ -1645,7 +1871,7 @@ with col2:
                         f"Annual range: {max(vt)-min(vt):.1f}°C."
                     )
                     show_ai_interpretation("Monthly Temperature for vegetation context", data_summary, location_name, llm, use_tl)
-                    st.plotly_chart(create_precipitation_chart(climate_df, location_name), use_container_width=True)
+                    st.markdown(create_precipitation_chart_html(climate_df, location_name), unsafe_allow_html=True)
                     vp = climate_df['total_precipitation'].tolist()
                     green_months = [m for m, p in zip(vm, vp) if p >= 30]
                     data_summary = (
